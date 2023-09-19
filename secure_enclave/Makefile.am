@@ -62,7 +62,7 @@ ENCLAVE_KEY=test_insecure_private_key.pem       #$(ENCLAVE)_private.pem
 
 ## Additional Automake flags needed to build the enclave.
 
-AM_CPPFLAGS += -O2 -Wall -Wno-implicit-function-declaration $(TGMP_CPPFLAGS) -I./third_party/SCIPR -I../third_party/SCIPR -I../sgx-sdk-build/sgxsdk/include/libcxx 
+AM_CPPFLAGS += -O2 -Wall -Wno-implicit-function-declaration $(TGMP_CPPFLAGS) -I./third_party/SCIPR -I../third_party/SCIPR -I$(SGXSDK_INCDIR)/libcxx 
 AM_CXXFLAGS += -fno-builtin -fstack-protector-strong
 
 
@@ -106,6 +106,7 @@ AM_LDFLAGS += $(TGMP_LDFLAGS) -L./tgmp-build/lib -L../tgmp-build/lib
 ## and SGX trusted libraries.
 
 secure_enclave_LDADD = @SGX_ENCLAVE_LDADD@
+secure_enclave_LINK= $(CXX) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 
 
 ## Place any additional trusted libraries that your enclave may need in
@@ -113,7 +114,7 @@ secure_enclave_LDADD = @SGX_ENCLAVE_LDADD@
 ## --startgroup and --endgroup flags. (This would be where you'd add
 ## SGXSSL libraries, and your trusted c++ library
 
-SGX_EXTRA_TLIBS=-lsgx_tgmp -lsgx_tservice -lsgx_urts -lsgx_tcxx 
+SGX_EXTRA_TLIBS=-lsgx_tgmp
 
 
 

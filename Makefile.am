@@ -45,8 +45,18 @@ secure_enclave.edl: secure_enclave/secure_enclave.edl
 #AM_CPPFLAGS += -g -Og
 
 
-AM_CFLAGS = -DUSER_SPACE -O2 -rdynamic -Wl,--no-as-needed -lSegFault -DSGXWALLET_VERSION="$(WALLET_VERSION)"
-AM_CXXFLAGS = ${AM_CPPFLAGS} -rdynamic -Wl,--no-as-needed -lSegFault -DSGXWALLET_VERSION="$(WALLET_VERSION)"
+AM_CFLAGS = -DUSER_SPACE -O2 -rdynamic -Wl,--no-as-needed -lSegFault -DSGXWALLET_VERSION="$(WALLET_VERSION)" \
+	-flegacy-pass-manager \
+	-Xclang -load -Xclang $(SGXSDK_LIBDIR)/libSGXFuzzerPass.so \
+	-fsanitize-coverage=inline-8bit-counters,bb,no-prune,pc-table,trace-cmp \
+	-fprofile-instr-generate \
+	-fcoverage-mapping
+AM_CXXFLAGS = ${AM_CPPFLAGS} -rdynamic -Wl,--no-as-needed -lSegFault -DSGXWALLET_VERSION="$(WALLET_VERSION)" \
+	-flegacy-pass-manager \
+	-Xclang -load -Xclang $(SGXSDK_LIBDIR)/libSGXFuzzerPass.so \
+	-fsanitize-coverage=inline-8bit-counters,bb,no-prune,pc-table,trace-cmp \
+	-fprofile-instr-generate \
+	-fcoverage-mapping
 
 
 AM_CPPFLAGS += -DSGXWALLET_VERSION="$(WALLET_VERSION)" -Wall -DSKALE_SGX=1 -DBINARY_OUTPUT=1 -Ileveldb/include -IlibBLS/bls\
@@ -62,7 +72,7 @@ CLEANFILES = $(COMMON_ENCLAVE_SRC) secure_enclave.edl secure_enclave.signed.so
 
 ## The build target
 
-bin_PROGRAMS = sgxwallet testw sgx_util
+bin_PROGRAMS = sgxwallet
 
 
 ## You can't use $(wildcard ...) with automake so all source files
@@ -103,14 +113,24 @@ secure_enclave.signed.so: secure_enclave/secure_enclave.signed.so
 ## Use the variables, not the actual library names to ensure these
 ## targets work on simulation builds.
 
+sgxwallet_LDFLAGS=$(AM_LDFLAGS) \
+   -Wl,-rpath=$(SGXSDK_LIBDIR) \
+   -Wl,-whole-archive -lSGXSanRTApp -Wl,-no-whole-archive \
+   -lSGXFuzzerRT \
+   -lcrypto \
+   -lboost_program_options \
+   -rdynamic \
+   -fuse-ld=lld \
+   -fprofile-instr-generate
 sgxwallet_LDADD=-l$(SGX_URTS_LIB) -l$(SGX_UAE_SERVICE_LIB) -LlibBLS/deps/deps_inst/x86_or_x64/lib -Lleveldb/build -LlibBLS/build \
    -LlibBLS/build/libff/libff \
    -Llibzmq/build/lib/ \
-   -l:libbls.a -l:libleveldb.a \
-   -l:libff.a -lgmp -ldl -l:libsgx_capable.a -l:libsgx_tprotected_fs.a \
+   -l:libbls.a -l:libleveldb.a -lsnappy \
+   -l:libff.a -lgmp -ldl -l:libsgx_capable.a -l:libsgx_uprotected_fs.a \
    -l:libzmq.a \
    -ljsonrpccpp-stub -ljsonrpccpp-server -ljsonrpccpp-client -ljsonrpccpp-common -ljsoncpp -lmicrohttpd \
    -lboost_system -lboost_thread -lgnutls -lgcrypt -lidn2 -lcurl -lssl -lcrypto -lz -lpthread -lstdc++fs
+sgxwallet_LINK= $(CXX) $(sgxwallet_LDFLAGS) $(LDFLAGS) -o $@
 
 testw_SOURCES=testw.cpp $(COMMON_SRC)
 nodist_testw_SOURCES=${nodist_sgxwallet_SOURCES}

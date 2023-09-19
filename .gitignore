@@ -52,3 +52,4 @@
 /cert/*.crt
 /jsonrpc/
 /sgx-gmp/
+Enclave.edl.json

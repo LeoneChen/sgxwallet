@@ -92,7 +92,7 @@ void SGXWallet::signalHandler( int signalNo ) {
 }
 
 
-int main(int argc, char *argv[]) {
+int __hidden_main(int argc, char *argv[]) {
     bool enterBackupKeyOption  = false;
     bool useHTTPSOption = true;
     bool printDebugInfoOption = false;
