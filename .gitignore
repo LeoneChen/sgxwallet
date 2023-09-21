@@ -52,3 +52,6 @@
 /cert/*.crt
 /jsonrpc/
 /sgx-gmp/
+sgx_util
+ghidra
+secure_enclave.signed.so.*

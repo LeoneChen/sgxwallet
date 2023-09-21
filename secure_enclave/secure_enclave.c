@@ -1,3 +1,4 @@
+#include "kafl_hc.h"
 /*
 
 Modifications Copyright (C) 2019-2020 SKALE Labs
@@ -123,6 +124,7 @@ unsigned char *globalRandom = NULL;
     } else {called = true;};
 
 void trustedEnclaveInit(uint64_t _logLevel) {
+    LogEnter(__func__);
     CALL_ONCE
     LOG_INFO(__FUNCTION__);
 
@@ -273,6 +275,7 @@ void sealHexSEK(int *errStatus, char *errString,
 
 void trustedGenerateSEK(int *errStatus, char *errString,
                         uint8_t *encrypted_sek, uint64_t *enc_len, char *sek_hex) {
+    LogEnter(__func__);
     CALL_ONCE
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
@@ -300,6 +303,7 @@ void trustedGenerateSEK(int *errStatus, char *errString,
 }
 
 void trustedSetSEK(int *errStatus, char *errString, uint8_t *encrypted_sek) {
+    LogEnter(__func__);
     CALL_ONCE
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
@@ -334,6 +338,7 @@ void trustedSetSEK(int *errStatus, char *errString, uint8_t *encrypted_sek) {
 
 void trustedSetSEKBackup(int *errStatus, char *errString,
                           uint8_t *encrypted_sek, uint64_t *enc_len, const char *sek_hex) {
+    LogEnter(__func__);
     CALL_ONCE
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
@@ -361,6 +366,7 @@ void trustedSetSEKBackup(int *errStatus, char *errString,
 
 void trustedGenerateEcdsaKey(int *errStatus, char *errString, int *is_exportable,
                                 uint8_t *encryptedPrivateKey, uint64_t *enc_len, char *pub_key_x, char *pub_key_y) {
+    LogEnter(__func__);
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
 
@@ -439,6 +445,7 @@ void trustedGenerateEcdsaKey(int *errStatus, char *errString, int *is_exportable
 
 void trustedGetPublicEcdsaKey(int *errStatus, char *errString,
                                  uint8_t *encryptedPrivateKey, uint64_t enc_len, char *pub_key_x, char *pub_key_y) {
+    LogEnter(__func__);
     LOG_DEBUG(__FUNCTION__);
     INIT_ERROR_STATE
 
@@ -510,6 +517,7 @@ static uint64_t sigCounter = 0;
 
 void trustedEcdsaSign(int *errStatus, char *errString, uint8_t *encryptedPrivateKey, uint64_t enc_len,
                          const char *hash, char *sigR, char *sigS, uint8_t *sig_v, int base) {
+    LogEnter(__func__);
     LOG_DEBUG(__FUNCTION__);
 
     INIT_ERROR_STATE
@@ -600,6 +608,7 @@ void trustedEcdsaSign(int *errStatus, char *errString, uint8_t *encryptedPrivate
 
 void trustedDecryptKey(int *errStatus, char *errString, uint8_t *encryptedPrivateKey,
                           uint64_t enc_len, char *key) {
+    LogEnter(__func__);
 
     LOG_DEBUG(__FUNCTION__);
     INIT_ERROR_STATE
@@ -647,6 +656,7 @@ void trustedDecryptKey(int *errStatus, char *errString, uint8_t *encryptedPrivat
 
 void trustedEncryptKey(int *errStatus, char *errString, const char *key,
                           uint8_t *encryptedPrivateKey, uint64_t *enc_len) {
+    LogEnter(__func__);
     LOG_INFO(__FUNCTION__);
 
     *errString = 0;
@@ -701,6 +711,7 @@ void trustedEncryptKey(int *errStatus, char *errString, const char *key,
 void trustedBlsSignMessage(int *errStatus, char *errString, uint8_t *encryptedPrivateKey,
                               uint64_t enc_len, char *_hashX,
                               char *_hashY, char *signature) {
+    LogEnter(__func__);
     LOG_DEBUG(__FUNCTION__);
     INIT_ERROR_STATE
 
@@ -745,6 +756,7 @@ void trustedBlsSignMessage(int *errStatus, char *errString, uint8_t *encryptedPr
 
 void
 trustedGenDkgSecret(int *errStatus, char *errString, uint8_t *encrypted_dkg_secret, uint64_t *enc_len, size_t _t) {
+    LogEnter(__func__);
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
 
@@ -790,6 +802,7 @@ void
 trustedDecryptDkgSecret(int *errStatus, char *errString, uint8_t *encrypted_dkg_secret,
                            uint64_t enc_len,
                            uint8_t *decrypted_dkg_secret) {
+    LogEnter(__func__);
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
 
@@ -842,6 +855,7 @@ void trustedGetEncryptedSecretShare(int *errStatus, char *errString,
                                     uint8_t *encrypted_skey, uint64_t *dec_len,
                                        char *result_str, char *s_shareG2, char *pub_keyB, uint8_t _t, uint8_t _n,
                                        uint8_t ind) {
+    LogEnter(__func__);
 
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
@@ -918,6 +932,7 @@ void trustedGetEncryptedSecretShareV2(int *errStatus, char *errString,
                                       uint8_t *encryptedSkey, uint64_t *decLen,
                                       char *resultStr, char *secretShareG2, char *pubKeyB, uint8_t _t, uint8_t _n,
                                       uint8_t ind) {
+    LogEnter(__func__);
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
 
@@ -996,6 +1011,7 @@ void trustedGetEncryptedSecretShareV2(int *errStatus, char *errString,
 void trustedGetPublicShares(int *errStatus, char *errString, uint8_t *encrypted_dkg_secret, uint64_t enc_len,
                                char *public_shares,
                                unsigned _t) {
+    LogEnter(__func__);
     LOG_INFO(__FUNCTION__);
 
     INIT_ERROR_STATE
@@ -1026,6 +1042,7 @@ void trustedGetPublicShares(int *errStatus, char *errString, uint8_t *encrypted_
 
 void trustedDkgVerify(int *errStatus, char *errString, const char *public_shares, const char *s_share,
                          uint8_t *encryptedPrivateKey, uint64_t enc_len, unsigned _t, int _ind, int *result) {
+    LogEnter(__func__);
     LOG_INFO(__FUNCTION__);
 
     INIT_ERROR_STATE
@@ -1078,6 +1095,7 @@ void trustedDkgVerify(int *errStatus, char *errString, const char *public_shares
 
 void trustedDkgVerifyV2(int *errStatus, char *errString, const char *publicShares, const char *secretShare,
                          uint8_t *encryptedPrivateKey, uint64_t encLen, unsigned _t, int _ind, int *result) {
+    LogEnter(__func__);
     LOG_INFO(__FUNCTION__);
 
     INIT_ERROR_STATE
@@ -1136,6 +1154,7 @@ void trustedDkgVerifyV2(int *errStatus, char *errString, const char *publicShare
 void trustedCreateBlsKey(int *errStatus, char *errString, const char *s_shares,
                             uint8_t *encryptedPrivateKey, uint64_t key_len, uint8_t *encr_bls_key,
                             uint64_t *enc_bls_key_len) {
+    LogEnter(__func__);
 
     LOG_INFO(__FUNCTION__);
 
@@ -1239,6 +1258,7 @@ void trustedCreateBlsKey(int *errStatus, char *errString, const char *s_shares,
 void trustedCreateBlsKeyV2(int *errStatus, char *errString, const char *secretShares,
                             uint8_t *encryptedPrivateKey, uint64_t keyLen, uint8_t *encrBlsKey,
                             uint64_t *encBlsKeyLen) {
+    LogEnter(__func__);
 
     LOG_INFO(__FUNCTION__);
 
@@ -1348,6 +1368,7 @@ void trustedCreateBlsKeyV2(int *errStatus, char *errString, const char *secretSh
 void
 trustedGetBlsPubKey(int *errStatus, char *errString, uint8_t *encryptedPrivateKey, uint64_t key_len,
                        char *bls_pub_key) {
+    LogEnter(__func__);
     LOG_DEBUG(__FUNCTION__);
 
     INIT_ERROR_STATE
@@ -1380,6 +1401,7 @@ trustedGetBlsPubKey(int *errStatus, char *errString, uint8_t *encryptedPrivateKe
 void trustedGetDecryptionShare( int *errStatus, char* errString, uint8_t* encryptedPrivateKey,
                                 const char* public_decryption_value, uint64_t key_len,
                                 char* decryption_share ) {
+    LogEnter(__func__);
     LOG_DEBUG(__FUNCTION__);
 
     INIT_ERROR_STATE
@@ -1411,6 +1433,7 @@ void trustedGetDecryptionShare( int *errStatus, char* errString, uint8_t* encryp
 
 void trustedGenerateBLSKey(int *errStatus, char *errString, int *isExportable,
                            uint8_t *encryptedPrivateKey, uint64_t *encLen) {
+    LogEnter(__func__);
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
 

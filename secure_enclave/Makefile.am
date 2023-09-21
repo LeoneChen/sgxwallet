@@ -87,6 +87,7 @@ secure_enclave_SOURCES = secure_enclave_t.c secure_enclave_t.h \
     DKGUtils.cpp  TEUtils.cpp EnclaveCommon.cpp  DomainParameters.cpp ../third_party/SCIPR/libff/algebra/curves/alt_bn128/alt_bn128_init.cpp \
                 ../third_party/SCIPR/libff/algebra/curves/alt_bn128/alt_bn128_g2.cpp \
                 ../third_party/SCIPR/libff/algebra/curves/alt_bn128/alt_bn128_g1.cpp $(ENCLAVE_KEY) $(ENCLAVE_CONFIG)
+EXTRA_secure_enclave_DEPENDENCIES = secure_enclave_t.h
 
 
 ## Add additional linker flags to AM_LDFLAGS here. Don't put
