@@ -89,6 +89,8 @@ POST_UNINSTALL = :
 libexec_PROGRAMS = $(am__EXEEXT_1) $(am__EXEEXT_2) $(am__EXEEXT_3)
 @ENCLAVE_RELEASE_SIGN_TRUE@am__append_1 = signed_enclave_rel
 @ENCLAVE_RELEASE_SIGN_FALSE@am__append_2 = signed_enclave_debug
+@ENCLAVE_FUZZ_TRUE@am__append_3 = -O2 -Wall -Wno-implicit-function-declaration $(TGMP_CPPFLAGS) -I./third_party/SCIPR -I../third_party/SCIPR -I$(SGXSDK_INCDIR)/libcxx
+@ENCLAVE_FUZZ_FALSE@am__append_4 = -O2 -Wall -Wno-implicit-function-declaration $(TGMP_CPPFLAGS) -I./third_party/SCIPR -I../third_party/SCIPR -I../sgx-sdk-build/sgxsdk/include/libcxx 
 subdir = secure_enclave
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/sgx_init.m4 \
@@ -109,8 +111,8 @@ am__objects_1 =
 am_secure_enclave_OBJECTS = secure_enclave_t.$(OBJEXT) \
 	secure_enclave.$(OBJEXT) Curves.$(OBJEXT) \
 	NumberTheory.$(OBJEXT) Point.$(OBJEXT) Signature.$(OBJEXT) \
-	DHDkg.$(OBJEXT) AESUtils.$(OBJEXT) DKGUtils.$(OBJEXT) \
-	TEUtils.$(OBJEXT) EnclaveCommon.$(OBJEXT) \
+	DHDkg.$(OBJEXT) HKDF.$(OBJEXT) AESUtils.$(OBJEXT) \
+	DKGUtils.$(OBJEXT) TEUtils.$(OBJEXT) EnclaveCommon.$(OBJEXT) \
 	DomainParameters.$(OBJEXT) alt_bn128_init.$(OBJEXT) \
 	alt_bn128_g2.$(OBJEXT) alt_bn128_g1.$(OBJEXT) $(am__objects_1) \
 	$(am__objects_1)
@@ -142,11 +144,11 @@ am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/AESUtils.Po ./$(DEPDIR)/Curves.Po \
 	./$(DEPDIR)/DHDkg.Po ./$(DEPDIR)/DKGUtils.Po \
 	./$(DEPDIR)/DomainParameters.Po ./$(DEPDIR)/EnclaveCommon.Po \
-	./$(DEPDIR)/NumberTheory.Po ./$(DEPDIR)/Point.Po \
-	./$(DEPDIR)/Signature.Po ./$(DEPDIR)/TEUtils.Po \
-	./$(DEPDIR)/alt_bn128_g1.Po ./$(DEPDIR)/alt_bn128_g2.Po \
-	./$(DEPDIR)/alt_bn128_init.Po ./$(DEPDIR)/secure_enclave.Po \
-	./$(DEPDIR)/secure_enclave_t.Po \
+	./$(DEPDIR)/HKDF.Po ./$(DEPDIR)/NumberTheory.Po \
+	./$(DEPDIR)/Point.Po ./$(DEPDIR)/Signature.Po \
+	./$(DEPDIR)/TEUtils.Po ./$(DEPDIR)/alt_bn128_g1.Po \
+	./$(DEPDIR)/alt_bn128_g2.Po ./$(DEPDIR)/alt_bn128_init.Po \
+	./$(DEPDIR)/secure_enclave.Po ./$(DEPDIR)/secure_enclave_t.Po \
 	./$(DEPDIR)/signed_enclave_debug.Po \
 	./$(DEPDIR)/signed_enclave_rel.Po
 am__mv = mv -f
@@ -331,10 +333,7 @@ SGX_EDGER8R = $(SGXSDK_BINDIR)/sgx_edger8r
 SGX_SIGN = $(SGXSDK_BINDIR)/sgx_sign
 SGXSSL_BINDIR = @SGXSSL_BINDIR@
 AM_CFLAGS = @SGX_ENCLAVE_CFLAGS@
-AM_CPPFLAGS = @SGX_ENCLAVE_CPPFLAGS@ -O2 -Wall \
-	-Wno-implicit-function-declaration $(TGMP_CPPFLAGS) \
-	-I./third_party/SCIPR -I../third_party/SCIPR \
-	-I../sgx-sdk-build/sgxsdk/include/libcxx
+AM_CPPFLAGS = @SGX_ENCLAVE_CPPFLAGS@ $(am__append_3) $(am__append_4)
 AM_CXXFLAGS = @SGX_ENCLAVE_CXXFLAGS@ @SGX_ENCLAVE_CFLAGS@ -fno-builtin \
 	-fstack-protector-strong
 AM_LDFLAGS = @SGX_ENCLAVE_LDFLAGS@ $(TGMP_LDFLAGS) -L./tgmp-build/lib \
@@ -348,13 +347,14 @@ ENCLAVE_CONFIG = $(ENCLAVE).config.xml
 ENCLAVE_KEY = test_insecure_private_key.pem       #$(ENCLAVE)_private.pem
 secure_enclave_SOURCES = secure_enclave_t.c secure_enclave_t.h \
 	secure_enclave.c \
-	Curves.c  NumberTheory.c Point.c Signature.c DHDkg.c AESUtils.c \
+        Curves.c  NumberTheory.c Point.c Signature.c DHDkg.c HKDF.c AESUtils.c \
     DKGUtils.cpp  TEUtils.cpp EnclaveCommon.cpp  DomainParameters.cpp ../third_party/SCIPR/libff/algebra/curves/alt_bn128/alt_bn128_init.cpp \
                 ../third_party/SCIPR/libff/algebra/curves/alt_bn128/alt_bn128_g2.cpp \
                 ../third_party/SCIPR/libff/algebra/curves/alt_bn128/alt_bn128_g1.cpp $(ENCLAVE_KEY) $(ENCLAVE_CONFIG)
 
 secure_enclave_LDADD = @SGX_ENCLAVE_LDADD@
-SGX_EXTRA_TLIBS = -lsgx_tgmp -lsgx_tservice -lsgx_urts -lsgx_tcxx 
+@ENCLAVE_FUZZ_FALSE@SGX_EXTRA_TLIBS = -lsgx_tgmp -lsgx_tservice -lsgx_urts -lsgx_tcxx 
+@ENCLAVE_FUZZ_TRUE@SGX_EXTRA_TLIBS = -lsgx_tgmp
 all: all-am
 
 .SUFFIXES:
@@ -448,6 +448,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/DKGUtils.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/DomainParameters.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/EnclaveCommon.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/HKDF.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/NumberTheory.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/Point.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/Signature.Po@am__quote@ # am--include-marker
@@ -670,6 +671,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/DKGUtils.Po
 	-rm -f ./$(DEPDIR)/DomainParameters.Po
 	-rm -f ./$(DEPDIR)/EnclaveCommon.Po
+	-rm -f ./$(DEPDIR)/HKDF.Po
 	-rm -f ./$(DEPDIR)/NumberTheory.Po
 	-rm -f ./$(DEPDIR)/Point.Po
 	-rm -f ./$(DEPDIR)/Signature.Po
@@ -732,6 +734,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/DKGUtils.Po
 	-rm -f ./$(DEPDIR)/DomainParameters.Po
 	-rm -f ./$(DEPDIR)/EnclaveCommon.Po
+	-rm -f ./$(DEPDIR)/HKDF.Po
 	-rm -f ./$(DEPDIR)/NumberTheory.Po
 	-rm -f ./$(DEPDIR)/Point.Po
 	-rm -f ./$(DEPDIR)/Signature.Po
@@ -787,7 +790,8 @@ uninstall-am: uninstall-libexecPROGRAMS
 signed_enclave_debug$(EXEEXT): $(ENCLAVE).signed$(EXEEXT) 
 
 $(ENCLAVE).signed$(EXEEXT): $(ENCLAVE)$(EXEEXT) $(ENCLAVE_CONFIG)
-	$(SGX_SIGN) sign $(SGX_SIGN_FLAGS) -key $(ENCLAVE_KEY) -enclave $(ENCLAVE).so -out $(ENCLAVE).signed.so -config $(ENCLAVE_CONFIG)
+@ENCLAVE_FUZZ_TRUE@	cp -f $< $@
+@ENCLAVE_FUZZ_FALSE@	$(SGX_SIGN) sign $(SGX_SIGN_FLAGS) -key $(ENCLAVE_KEY) -enclave $(ENCLAVE).so -out $(ENCLAVE).signed.so -config $(ENCLAVE_CONFIG)
 
 signed_enclave_rel$(EXEEXT):
 	@echo "--------------------------------------------------------------"

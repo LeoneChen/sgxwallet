@@ -70,7 +70,11 @@ endif
 signed_enclave_debug$(EXEEXT): $(ENCLAVE).signed$(EXEEXT) 
 
 $(ENCLAVE).signed$(EXEEXT): $(ENCLAVE)$(EXEEXT) $(ENCLAVE_CONFIG)
+if ENCLAVE_FUZZ
+	cp -f $< $@
+else
 	$(SGX_SIGN) sign $(SGX_SIGN_FLAGS) -key $(ENCLAVE_KEY) -enclave $(ENCLAVE).so -out $(ENCLAVE).signed.so -config $(ENCLAVE_CONFIG)
+endif
 
 signed_enclave_rel$(EXEEXT):
 	@echo "--------------------------------------------------------------"

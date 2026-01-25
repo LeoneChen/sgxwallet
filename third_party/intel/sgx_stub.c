@@ -252,7 +252,11 @@ sgx_status_t sgx_get_target_info(const sgx_enclave_id_t enclave_id, sgx_target_i
 	return (sgx_status_t) p_sgx_get_target_info(enclave_id, target_info);
 }
 
+#if ENCLAVE_FUZZ
+int no_sgx_thread_setwait_untrusted_events_ocall(const void *waiter, const void *self)
+#else
 int sgx_thread_setwait_untrusted_events_ocall(const void *waiter, const void *self)
+#endif
 {
 	if ( l_sgx_thread_setwait_untrusted_events_ocall == 0 ) {
 		if ( h_libsgx_urts == 0 ) _load_libsgx_urts();
@@ -300,7 +304,11 @@ sgx_status_t sgx_get_whitelist_size(uint32_t *p_whitelist_size)
 	return (sgx_status_t) p_sgx_get_whitelist_size(p_whitelist_size);
 }
 
+#if ENCLAVE_FUZZ
+sgx_status_t no_sgx_create_enclave_ex(const char *file_name, const int debug, sgx_launch_token_t *launch_token, int *launch_token_updated, sgx_enclave_id_t *enclave_id, sgx_misc_attribute_t *misc_attr, const uint32_t ex_features, const void **ex_features_p)
+#else
 sgx_status_t sgx_create_enclave_ex(const char *file_name, const int debug, sgx_launch_token_t *launch_token, int *launch_token_updated, sgx_enclave_id_t *enclave_id, sgx_misc_attribute_t *misc_attr, const uint32_t ex_features, const void **ex_features_p)
+#endif
 {
 	if ( l_sgx_create_enclave_ex == 0 ) {
 		if ( h_libsgx_urts == 0 ) _load_libsgx_urts();
@@ -312,7 +320,11 @@ sgx_status_t sgx_create_enclave_ex(const char *file_name, const int debug, sgx_l
 	return (sgx_status_t) p_sgx_create_enclave_ex(file_name, debug, launch_token, launch_token_updated, enclave_id, misc_attr, ex_features, ex_features_p);
 }
 
+#if ENCLAVE_FUZZ
+sgx_status_t no_sgx_create_enclave(const char *file_name, const int debug, sgx_launch_token_t *launch_token, int *launch_token_updated, sgx_enclave_id_t *enclave_id, sgx_misc_attribute_t *misc_attr)
+#else
 sgx_status_t sgx_create_enclave(const char *file_name, const int debug, sgx_launch_token_t *launch_token, int *launch_token_updated, sgx_enclave_id_t *enclave_id, sgx_misc_attribute_t *misc_attr)
+#endif
 {
 	if ( l_sgx_create_enclave == 0 ) {
 		if ( h_libsgx_urts == 0 ) _load_libsgx_urts();
@@ -348,7 +360,11 @@ void sgx_oc_cpuidex(int *cpuinfo, int leaf, int subleaf)
 	return (void) p_sgx_oc_cpuidex(cpuinfo, leaf, subleaf);
 }
 
+#if ENCLAVE_FUZZ
+sgx_status_t no_sgx_destroy_enclave(const sgx_enclave_id_t enclave_id)
+#else
 sgx_status_t sgx_destroy_enclave(const sgx_enclave_id_t enclave_id)
+#endif
 {
 	if ( l_sgx_destroy_enclave == 0 ) {
 		if ( h_libsgx_urts == 0 ) _load_libsgx_urts();
@@ -432,7 +448,11 @@ sgx_status_t sgx_get_quote_size(const uint8_t *p_sig_rl, uint32_t *p_quote_size)
 	return (sgx_status_t) p_sgx_get_quote_size(p_sig_rl, p_quote_size);
 }
 
+#if ENCLAVE_FUZZ
+sgx_status_t no_sgx_ocall(const unsigned int index, void *ms)
+#else
 sgx_status_t sgx_ocall(const unsigned int index, void *ms)
+#endif
 {
 	if ( l_sgx_ocall == 0 ) {
 		if ( h_libsgx_urts == 0 ) _load_libsgx_urts();
@@ -468,7 +488,11 @@ sgx_status_t sgx_calc_quote_size(const uint8_t *p_sig_rl, uint32_t sig_rl_size, 
 	return (sgx_status_t) p_sgx_calc_quote_size(p_sig_rl, sig_rl_size, p_quote_size);
 }
 
+#if ENCLAVE_FUZZ
+int no_sgx_thread_wait_untrusted_event_ocall(const void *self)
+#else
 int sgx_thread_wait_untrusted_event_ocall(const void *self)
+#endif
 {
 	if ( l_sgx_thread_wait_untrusted_event_ocall == 0 ) {
 		if ( h_libsgx_urts == 0 ) _load_libsgx_urts();
@@ -480,7 +504,11 @@ int sgx_thread_wait_untrusted_event_ocall(const void *self)
 	return (int) p_sgx_thread_wait_untrusted_event_ocall(self);
 }
 
+#if ENCLAVE_FUZZ
+sgx_status_t no_sgx_ecall_switchless(const sgx_enclave_id_t eid, const int index, const void *ocall_table, void *ms)
+#else
 sgx_status_t sgx_ecall_switchless(const sgx_enclave_id_t eid, const int index, const void *ocall_table, void *ms)
+#endif
 {
 	if ( l_sgx_ecall_switchless == 0 ) {
 		if ( h_libsgx_urts == 0 ) _load_libsgx_urts();
@@ -524,7 +552,11 @@ sgx_status_t sgx_create_encrypted_enclave(const char *file_name, const int debug
 	return (sgx_status_t) p_sgx_create_encrypted_enclave(file_name, debug, launch_token, launch_token_updated, enclave_id, misc_attr, sealed_key);
 }
 
+#if ENCLAVE_FUZZ
+int no_sgx_thread_set_untrusted_event_ocall(const void *waiter)
+#else
 int sgx_thread_set_untrusted_event_ocall(const void *waiter)
+#endif
 {
 	if ( l_sgx_thread_set_untrusted_event_ocall == 0 ) {
 		if ( h_libsgx_urts == 0 ) _load_libsgx_urts();
@@ -548,7 +580,11 @@ sgx_status_t sgx_get_quote_size_ex(const sgx_att_key_id_t *p_att_key_id, uint32_
 	return (sgx_status_t) p_sgx_get_quote_size_ex(p_att_key_id, p_quote_size);
 }
 
+#if ENCLAVE_FUZZ
+sgx_status_t no_sgx_ecall(const sgx_enclave_id_t eid, const int index, const void *ocall_table, void *ms)
+#else
 sgx_status_t sgx_ecall(const sgx_enclave_id_t eid, const int index, const void *ocall_table, void *ms)
+#endif
 {
 	if ( l_sgx_ecall == 0 ) {
 		if ( h_libsgx_urts == 0 ) _load_libsgx_urts();
@@ -560,7 +596,11 @@ sgx_status_t sgx_ecall(const sgx_enclave_id_t eid, const int index, const void *
 	return (sgx_status_t) p_sgx_ecall(eid, index, ocall_table, ms);
 }
 
+#if ENCLAVE_FUZZ
+int no_sgx_thread_set_multiple_untrusted_events_ocall(const void **waiters, size_t total)
+#else
 int sgx_thread_set_multiple_untrusted_events_ocall(const void **waiters, size_t total)
+#endif
 {
 	if ( l_sgx_thread_set_multiple_untrusted_events_ocall == 0 ) {
 		if ( h_libsgx_urts == 0 ) _load_libsgx_urts();

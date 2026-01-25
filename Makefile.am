@@ -62,7 +62,11 @@ CLEANFILES = $(COMMON_ENCLAVE_SRC) secure_enclave.edl secure_enclave.signed.so
 
 ## The build target
 
+if ENCLAVE_FUZZ
+bin_PROGRAMS = sgxwallet
+else
 bin_PROGRAMS = sgxwallet testw sgx_util
+endif
 
 
 ## You can't use $(wildcard ...) with automake so all source files
@@ -103,6 +107,16 @@ secure_enclave.signed.so: secure_enclave/secure_enclave.signed.so
 ## Use the variables, not the actual library names to ensure these
 ## targets work on simulation builds.
 
+if ENCLAVE_FUZZ
+sgxwallet_CPPFLAGS=$(AM_CPPFLAGS) -DENCLAVE_FUZZ=1
+sgxwallet_LDFLAGS=$(AM_LDFLAGS) \
+   -Wl,-rpath=$(SGXSDK_LIBDIR) \
+   -Wl,-whole-archive -lSGXSanRTApp -Wl,-no-whole-archive \
+   -lSGXFuzzerRT \
+   -lcrypto \
+   -lboost_program_options \
+   -rdynamic
+endif
 sgxwallet_LDADD=-l$(SGX_URTS_LIB) -l$(SGX_UAE_SERVICE_LIB) -LlibBLS/deps/deps_inst/x86_or_x64/lib -Lleveldb/build -LlibBLS/build \
    -LlibBLS/build/libff/libff \
    -Llibzmq/build/lib/ \

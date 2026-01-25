@@ -92,7 +92,11 @@ void SGXWallet::signalHandler( int signalNo ) {
 }
 
 
+#if ENCLAVE_FUZZ
+int no_main(int argc, char *argv[]) {
+#else
 int main(int argc, char *argv[]) {
+#endif
     bool enterBackupKeyOption  = false;
     bool useHTTPSOption = true;
     bool printDebugInfoOption = false;
