@@ -72,6 +72,11 @@ int gen_session_key(char *skey_str, char *pb_keyB, char *common_key) {
         goto clean;
     }
 
+    if (strlen(pb_keyB) < 128) {
+        LOG_ERROR("gen_session_key: pb_keyB too short");
+        goto clean;
+    }
+
     strncpy(pb_keyB_x, pb_keyB, 64);
     pb_keyB_x[64] = 0;
 
@@ -86,11 +91,16 @@ int gen_session_key(char *skey_str, char *pb_keyB, char *common_key) {
 
     SAFE_CHAR_BUF(arr_x, BUF_LEN);
     mpz_get_str(arr_x, 16, session_key->x);
-    int n_zeroes = 64 - strlen(arr_x);
+    size_t arr_x_len = strlen(arr_x);
+    if (arr_x_len > 64) {
+        LOG_ERROR("arr_x too long");
+        goto clean;
+    }
+    int n_zeroes = 64 - arr_x_len;
     for (int i = 0; i < n_zeroes; i++) {
         common_key[i] = '0';
     }
-    strncpy(common_key + n_zeroes, arr_x, strlen(arr_x));
+    strncpy(common_key + n_zeroes, arr_x, arr_x_len);
     common_key[64] = 0;
 
     ret = 0;
@@ -148,11 +158,16 @@ int session_key_recover(const char *skey_str, const char *sshare, char *common_k
     SAFE_CHAR_BUF(arr_x, BUF_LEN);
 
     mpz_get_str(arr_x, 16, session_key->x);
-    int n_zeroes = 64 - strlen(arr_x);
+    size_t arr_x_len = strlen(arr_x);
+    if (arr_x_len > 64) {
+        LOG_ERROR("arr_x too long");
+        goto clean;
+    }
+    int n_zeroes = 64 - arr_x_len;
     for (int i = 0; i < n_zeroes; i++) {
         common_key[i] = '0';
     }
-    strncpy(common_key + n_zeroes, arr_x, strlen(arr_x));
+    strncpy(common_key + n_zeroes, arr_x, arr_x_len);
 
     ret = 0;
 

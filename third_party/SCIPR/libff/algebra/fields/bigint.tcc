@@ -28,7 +28,11 @@ template<mp_size_t n>
 bigint<n>::bigint(const char* s) /// Initialize from a string containing an integer in decimal notation
 {
     size_t l = strlen(s);
-    unsigned char* s_copy = new unsigned char[l];
+    unsigned char s_copy[1024];
+
+    if (l > 1024) {
+       abort();
+    }
 
     for (size_t i = 0; i < l; ++i)
     {
@@ -38,8 +42,6 @@ bigint<n>::bigint(const char* s) /// Initialize from a string containing an inte
 
     mp_size_t limbs_written = mpn_set_str(this->data, s_copy, l, 10);
     assert(limbs_written <= n);
-
-    delete[] s_copy;
 }
 
 template<mp_size_t n>

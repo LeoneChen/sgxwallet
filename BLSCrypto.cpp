@@ -246,7 +246,7 @@ string encryptBLSKeyShare2Hex(int *errStatus, char *err_string, const char *_key
 
     sgx_status_t status = SGX_SUCCESS;
 
-    status = trustedEncryptKey(eid, errStatus, errMsg.data(), keyArray->data(), encryptedKey->data(),
+    status = trustedEncryptKey(eid, errStatus, errMsg.data(), keyArray->data(), keyArray->size(), encryptedKey->data(),
                                &encryptedLen);
 
     HANDLE_TRUSTED_FUNCTION_ERROR(status, *errStatus, errMsg.data());

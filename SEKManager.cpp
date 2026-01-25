@@ -65,7 +65,7 @@ void create_test_key() {
 
     {
         READ_LOCK(sgxInitMutex);
-        status = trustedEncryptKey(eid, &errStatus, errMsg.data(), key.c_str(), encrypted_key, &enc_len);
+        status = trustedEncryptKey(eid, &errStatus, errMsg.data(), key.c_str(), key.size() + 1, encrypted_key, &enc_len);
     }
 
     HANDLE_TRUSTED_FUNCTION_ERROR(status, errStatus, errMsg.data());

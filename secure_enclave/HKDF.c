@@ -85,8 +85,8 @@ int hkdfExpand(char* prk, char* keyInfo, int length, char* okm) {
     SAFE_CHAR_BUF(t, BUF_LEN);
     SAFE_CHAR_BUF(tmp, BUF_LEN);
     for (int i = 0; i < n; ++i) {
-        char hex[4] = "0x01";
-        snprintf(hex + 3, 1, "%d", i + 1);
+        char hex[5] = "0x01";
+        snprintf(hex + 3, 2, "%d", i + 1);
         SAFE_CHAR_BUF(toHash, BUF_LEN);
         if (i > 0) {
             strncat(toHash, tmp, ECDSA_BIN_LEN - 1);

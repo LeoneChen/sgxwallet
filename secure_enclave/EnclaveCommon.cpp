@@ -335,7 +335,7 @@ enum log_level {
     L_TRACE = 0, L_DEBUG = 1, L_INFO = 2, L_WARNING = 3, L_ERROR = 4
 };
 
-uint32_t globalLogLevel_ = 2;
+uint64_t globalLogLevel_ = 2;
 
 void logMsg(log_level _level, const char *_msg) {
     if (_level < globalLogLevel_)

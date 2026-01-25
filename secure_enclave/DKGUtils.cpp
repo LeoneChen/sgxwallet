@@ -228,7 +228,7 @@ bool isG2( const libff::alt_bn128_G2& point ) {
          libff::alt_bn128_G2::order() * point == libff::alt_bn128_G2::zero();
 }
 
-int gen_dkg_poly(char *secret, unsigned _t) {
+int gen_dkg_poly(char *secret, unsigned _t, uint64_t max_len) {
 
     int status = 1;
     string result;
@@ -245,6 +245,12 @@ int gen_dkg_poly(char *secret, unsigned _t) {
             result += stringFromFr(cur_coef);
             result += ":";
         }
+        
+        if (result.length() >= max_len) {
+             LOG_ERROR("gen_dkg_poly: Output buffer too small");
+             return status;
+        }
+        
         strncpy(secret, result.c_str(), result.length() + 1);
 
         if (strlen(secret) == 0) {
@@ -291,7 +297,7 @@ libff::alt_bn128_Fr PolynomialValue(const vector <libff::alt_bn128_Fr> &pol, lib
 
 void calc_secret_shares(const char *decrypted_coeffs,
                         char *secret_shares,      // calculates secret shares in base 10 to a string secret_shares,
-                        unsigned _t, unsigned _n) {                                                 // separated by ":"
+                        unsigned _t, unsigned _n, uint64_t max_len) {                                                 // separated by ":"
 
     // calculate for each node a list of secret values that will be used for verification
     string result;
@@ -311,6 +317,12 @@ void calc_secret_shares(const char *decrypted_coeffs,
             result += ConvertToString(secret_share);
             result += ":";
         }
+        
+        if (result.length() >= max_len) {
+            LOG_ERROR("Output buffer too small");
+            return;
+        }
+
         strncpy(secret_shares, result.c_str(), result.length() + 1);
 
     } catch (exception &e) {
@@ -343,6 +355,10 @@ int calc_secret_share(const char *decrypted_coeffs, char *s_share,
 
         libff::alt_bn128_Fr secret_share = PolynomialValue(poly, libff::alt_bn128_Fr(ind), _t);
         string cur_share = ConvertToString(secret_share, 16);
+        if (cur_share.size() > 64) {
+            LOG_ERROR("cur_share too long");
+            return result;
+        }
         int n_zeroes = 64 - cur_share.size();
         cur_share.insert(0, n_zeroes, '0');
 
@@ -411,7 +427,7 @@ int calc_secret_shareG2(const char *s_share, char *s_shareG2) {
 }
 
 int calc_public_shares(const char *decrypted_coeffs, char *public_shares,
-                       unsigned _t) {
+                       unsigned _t, uint64_t max_len) {
 
     // calculate for each node a list of public shares
     int ret = 1;
@@ -434,7 +450,12 @@ int calc_public_shares(const char *decrypted_coeffs, char *public_shares,
             string pub_share_str = ConvertG2ToString(pub_share);
             result += pub_share_str + ",";
         }
+        if (result.length() >= max_len) {
+            LOG_ERROR("Output buffer too small");
+            return 3;
+        }
         strncpy(public_shares, result.c_str(), result.length());
+        public_shares[result.length()] = '\0';
         ret = 0;
 
     } catch (exception &e) {
@@ -528,15 +549,15 @@ int Verification(char *public_shares, mpz_t decr_secret_share, int _t, int ind) 
 
         libff::alt_bn128_G2 val2 = sshare * libff::alt_bn128_G2::one();
 
-        memset(public_shares, 0, strlen(public_shares));
-        strncpy(public_shares, tmp, strlen(tmp));
+        // memset(public_shares, 0, strlen(public_shares));
+        // strncpy(public_shares, tmp, strlen(tmp));
 
         val.to_affine_coordinates();
         val2.to_affine_coordinates();
-        strncpy(public_shares, ConvertToString(val.X.c0).c_str(), ConvertToString(val.X.c0).length());
-        strncpy(public_shares + ConvertToString(val.X.c0).length(), ":", 1);
-        strncpy(public_shares + ConvertToString(val.X.c0).length() + 1, ConvertToString(val2.X.c0).c_str(),
-                ConvertToString(val2.X.c0).length());
+        // strncpy(public_shares, ConvertToString(val.X.c0).c_str(), ConvertToString(val.X.c0).length());
+        // strncpy(public_shares + ConvertToString(val.X.c0).length(), ":", 1);
+        // strncpy(public_shares + ConvertToString(val.X.c0).length() + 1, ConvertToString(val2.X.c0).c_str(),
+        //         ConvertToString(val2.X.c0).length());
 
         ret = (val == sshare * libff::alt_bn128_G2::one());
 

@@ -58,7 +58,7 @@ EXTERNC void LOG_ERROR(const char* _msg);
 EXTERNC void LOG_DEBUG(const char* _msg);
 EXTERNC void LOG_TRACE(const char* _msg);
 
-extern uint32_t globalLogLevel_;
+extern uint64_t globalLogLevel_;
 
 extern unsigned char* globalRandom;
 

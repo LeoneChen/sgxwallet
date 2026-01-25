@@ -171,6 +171,12 @@ EXTERNC int getDecryptionShare(char* skey_hex, char* decryptionValue, char* decr
 
         auto splitted_decryption_value = SplitStringToFq(decryptionValue, ':');
 
+        if (splitted_decryption_value.size() < 4) {
+            LOG_ERROR("Invalid public_decryption_value format");
+            mpz_clear(skey);
+            return 1;
+        }
+
         libff::alt_bn128_G2 decryption_value;
         decryption_value.Z = libff::alt_bn128_Fq2::one();
 

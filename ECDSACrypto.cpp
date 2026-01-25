@@ -239,7 +239,7 @@ string encryptECDSAKey(const string& _key) {
 
     sgx_status_t status = SGX_SUCCESS;
 
-    status = trustedEncryptKey(eid, &errStatus, errString.data(), key.data(),
+    status = trustedEncryptKey(eid, &errStatus, errString.data(), key.data(), key.size(),
                                encryptedKey.data(), &enc_len);
 
     HANDLE_TRUSTED_FUNCTION_ERROR(status, errStatus, errString.data());

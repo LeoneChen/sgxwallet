@@ -1108,7 +1108,7 @@ TEST_CASE_METHOD(TestFixture, "AES encrypt/decrypt", "[aes-encrypt-decrypt]") {
     vector <uint8_t> encrypted_key(BUF_LEN, 0);
 
     PRINT_SRC_LINE
-    auto status = trustedEncryptKey(eid, &errStatus, errMsg.data(), key.c_str(), encrypted_key.data(), &encLen);
+    auto status = trustedEncryptKey(eid, &errStatus, errMsg.data(), key.c_str(), key.size() + 1, encrypted_key.data(), &encLen);
 
     REQUIRE(status == 0);
     REQUIRE(errStatus == 0);
@@ -1158,7 +1158,7 @@ TEST_CASE_METHOD(TestFixture, "Exportable / non-exportable keys", "[exportable-n
     string key = SAMPLE_AES_KEY;
     vector <uint8_t> encrypted_key(BUF_LEN, 0);
 
-    status = trustedEncryptKey(eid, &errStatus, errMsg.data(), key.c_str(), encrypted_key.data(), &encLen);
+    status = trustedEncryptKey(eid, &errStatus, errMsg.data(), key.c_str(), key.size() + 1, encrypted_key.data(), &encLen);
 
     REQUIRE(status == 0);
     REQUIRE(errStatus == 0);

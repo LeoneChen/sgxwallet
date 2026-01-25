@@ -127,11 +127,17 @@ int AES_decrypt(uint8_t *encrMessage, uint64_t length, char *message, uint64_t m
                                                     NULL, 0,
                                                     (sgx_aes_gcm_128bit_tag_t *)encrMessage);
 
+    if (status != SGX_SUCCESS) {
+        return status;
+    }
+
+    if (len < 2) {
+        return -7;
+    }
+
     *type = message[0];
     *exportable = message[1];
-    for (int i = 2; i < strlen(message) + 1; i++) {
-        message[i - 2 ] = message[i];
-    }
+    memmove(message, message + 2, len - 2);
 
     return status;
 }

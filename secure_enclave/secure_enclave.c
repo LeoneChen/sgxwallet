@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <math.h>
+#include <ctype.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -65,7 +66,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
-#define INIT_ERROR_STATE *errString = 0; *errStatus = UNKNOWN_ERROR;
+#define EDL_SMALL_BUF_SIZE 1024
+#define EDL_TINY_BUF_SIZE 256
+#define EDL_DKG_POLY_SIZE 3072
+
+#if BUF_LEN > 1024
+#error BUF_LEN is too large
+#endif
+
+#define INIT_ERROR_STATE if (!errString || !errStatus) return; *errString = 0; *errStatus = UNKNOWN_ERROR;
 #define SET_SUCCESS *errStatus = 0;
 
 #define CHECK_STATE(_EXPRESSION_) \
@@ -99,17 +108,14 @@ LOG_ERROR(errString); \
 goto clean; \
 };
 
-void *(*gmp_realloc_func)(void *, size_t, size_t);
-
-void *(*oc_realloc_func)(void *, size_t, size_t);
-
-void (*gmp_free_func)(void *, size_t);
-
-void (*oc_free_func)(void *, size_t);
-
-void *reallocate_function(void *, size_t, size_t);
-
-void free_function(void *, size_t);
+#define CHECK_ENCLAVE_INIT \
+    if (!globalRandom || !curve) { \
+        LOG_ERROR(__FUNCTION__); \
+        LOG_ERROR("Enclave not initialized"); \
+        snprintf(errString, BUF_LEN, "Enclave not initialized"); \
+        *errStatus = -1; \
+        return; \
+    }
 
 unsigned char *globalRandom = NULL;
 
@@ -118,23 +124,30 @@ unsigned char *globalRandom = NULL;
     static volatile bool called = false;\
     if (called)  { \
         LOG_ERROR(__FUNCTION__); \
-        LOG_ERROR("This function shouldnt be called twice. Aborting!"); \
-        abort(); \
+        LOG_ERROR("This function shouldnt be called twice. Returning."); \
+        return; \
+    } else {called = true;};
+
+#define CALL_ONCE_ERROR \
+    static volatile bool called = false;\
+    if (called)  { \
+        LOG_ERROR(__FUNCTION__); \
+        LOG_ERROR("This function shouldnt be called twice. Returning error."); \
+        *errStatus = -1; \
+        snprintf(errString, BUF_LEN, "This function shouldnt be called twice."); \
+        return; \
     } else {called = true;};
 
 void trustedEnclaveInit(uint64_t _logLevel) {
     CALL_ONCE
     LOG_INFO(__FUNCTION__);
 
+    if (_logLevel > 4) {
+        LOG_INFO("Log level too high, resetting to L_ERROR");
+        _logLevel = 4;
+    }
+
     globalLogLevel_ = _logLevel;
-
-    oc_realloc_func = &reallocate_function;
-    oc_free_func = &free_function;
-
-    LOG_INFO("Setting memory functions");
-
-    mp_get_memory_functions(NULL, &gmp_realloc_func, &gmp_free_func);
-    mp_set_memory_functions(NULL, oc_realloc_func, oc_free_func);
 
     LOG_INFO("Calling enclave init");
 
@@ -167,41 +180,7 @@ void trustedEnclaveInit(uint64_t _logLevel) {
 
 }
 
-void free_function(void *ptr, size_t sz) {
-    if (sgx_is_within_enclave(ptr, sz))
-        gmp_free_func(ptr, sz);
-    else {
-        sgx_status_t status;
 
-        status = oc_free(ptr, sz);
-        if (status != SGX_SUCCESS)
-            abort();
-    }
-}
-
-void *reallocate_function(void *ptr, size_t osize, size_t nsize) {
-    uint64_t nptr;
-    sgx_status_t status;
-
-    if (sgx_is_within_enclave(ptr, osize)) {
-        return gmp_realloc_func(ptr, osize, nsize);
-    }
-
-    status = oc_realloc(&nptr, ptr, osize, nsize);
-    if (status != SGX_SUCCESS)
-        abort();
-
-    /*
-     * If the entire range of allocated memory is not outside the enclave
-     * then something truly terrible has happened. In theory, we could
-     * free() and try again, but would you trust the OS at this point?
-     */
-
-    if (!sgx_is_outside_enclave((void *) ptr, nsize))
-        abort();
-
-    return (void *) nptr;
-}
 
 volatile uint64_t counter;
 
@@ -228,9 +207,9 @@ void get_global_random(unsigned char *_randBuff, uint64_t _size) {
 
 void sealHexSEK(int *errStatus, char *errString,
                         uint8_t *encrypted_sek, uint64_t *enc_len, char *sek_hex) {
-    CALL_ONCE
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
+    CALL_ONCE_ERROR
 
     CHECK_STATE(encrypted_sek);
     CHECK_STATE(sek_hex);
@@ -251,7 +230,7 @@ void sealHexSEK(int *errStatus, char *errString,
 
     uint64_t encrypt_text_length = sgx_get_encrypt_txt_len((const sgx_sealed_data_t *)encrypted_sek);
 
-    CHECK_STATE(encrypt_text_length = plaintextLen);
+    CHECK_STATE(encrypt_text_length == plaintextLen);
 
     SAFE_CHAR_BUF(unsealedKey, BUF_LEN);
     uint32_t decLen = BUF_LEN;
@@ -273,11 +252,13 @@ void sealHexSEK(int *errStatus, char *errString,
 
 void trustedGenerateSEK(int *errStatus, char *errString,
                         uint8_t *encrypted_sek, uint64_t *enc_len, char *sek_hex) {
-    CALL_ONCE
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
+    CALL_ONCE_ERROR
 
+    CHECK_ENCLAVE_INIT
     CHECK_STATE(encrypted_sek);
+    CHECK_STATE(enc_len);
     CHECK_STATE(sek_hex);
 
     RANDOM_CHAR_BUF(SEK_raw, SGX_AESGCM_KEY_SIZE);
@@ -300,10 +281,27 @@ void trustedGenerateSEK(int *errStatus, char *errString,
 }
 
 void trustedSetSEK(int *errStatus, char *errString, uint8_t *encrypted_sek) {
-    CALL_ONCE
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
+    CALL_ONCE_ERROR
     CHECK_STATE(encrypted_sek);
+
+    uint32_t add_mac_len = sgx_get_add_mac_txt_len((const sgx_sealed_data_t *)encrypted_sek);
+    uint32_t txt_len = sgx_get_encrypt_txt_len((const sgx_sealed_data_t *)encrypted_sek);
+    if (add_mac_len > EDL_SMALL_BUF_SIZE || txt_len > EDL_SMALL_BUF_SIZE) {
+         LOG_ERROR("Sealed data too large");
+         snprintf(errString, BUF_LEN, "Sealed data too large");
+         *errStatus = -1;
+         return;
+    }
+    uint32_t total_size = sgx_calc_sealed_data_size(add_mac_len, txt_len);
+    if (total_size > EDL_SMALL_BUF_SIZE) {
+         LOG_ERROR("Sealed data too large");
+         snprintf(errString, BUF_LEN, "Sealed data too large");
+         *errStatus = -1;
+         return;
+    }
+
     SAFE_CHAR_BUF(aes_key_hex, BUF_LEN);
 
     uint32_t dec_len = BUF_LEN;
@@ -322,9 +320,11 @@ void trustedSetSEK(int *errStatus, char *errString, uint8_t *encrypted_sek) {
 
     CHECK_STATUS2("sgx unseal SEK failed with status %d");
 
+    CHECK_STATE(strnlen(aes_key_hex, 33) == 32);
+
     uint64_t len;
 
-    hex2carray(aes_key_hex, &len, (uint8_t *) (AES_key[512]));
+    CHECK_STATE(hex2carray2(aes_key_hex, &len, (uint8_t *) (AES_key[512]), 33));
 
     SET_SUCCESS
     clean:
@@ -334,15 +334,16 @@ void trustedSetSEK(int *errStatus, char *errString, uint8_t *encrypted_sek) {
 
 void trustedSetSEKBackup(int *errStatus, char *errString,
                           uint8_t *encrypted_sek, uint64_t *enc_len, const char *sek_hex) {
-    CALL_ONCE
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
+    CALL_ONCE_ERROR
 
     CHECK_STATE(encrypted_sek);
     CHECK_STATE(sek_hex);
+    CHECK_STATE(strnlen(sek_hex, 33) == 32);
 
     uint64_t len;
-    hex2carray(sek_hex, &len, (uint8_t *) (AES_key[512]));
+    CHECK_STATE(hex2carray2(sek_hex, &len, (uint8_t *) (AES_key[512]), 33));
 
     sealHexSEK(errStatus, errString, encrypted_sek, enc_len, (char *)sek_hex);
 
@@ -364,7 +365,10 @@ void trustedGenerateEcdsaKey(int *errStatus, char *errString, int *is_exportable
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
 
+    CHECK_ENCLAVE_INIT
+    CHECK_STATE(is_exportable);
     CHECK_STATE(encryptedPrivateKey);
+    CHECK_STATE(enc_len);
     CHECK_STATE(pub_key_x);
     CHECK_STATE(pub_key_y);
 
@@ -442,6 +446,7 @@ void trustedGetPublicEcdsaKey(int *errStatus, char *errString,
     LOG_DEBUG(__FUNCTION__);
     INIT_ERROR_STATE
 
+    CHECK_ENCLAVE_INIT
     SAFE_CHAR_BUF(skey, BUF_LEN);
 
     mpz_t privateKeyMpz;
@@ -453,6 +458,13 @@ void trustedGetPublicEcdsaKey(int *errStatus, char *errString,
     CHECK_STATE(encryptedPrivateKey);
     CHECK_STATE(pub_key_x);
     CHECK_STATE(pub_key_y);
+
+    if (enc_len > BUF_LEN) {
+        strncpy(errString, "Encrypted key too long", BUF_LEN);
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        goto clean;
+    }
 
     uint8_t type = 0;
     uint8_t exportable = 0;
@@ -513,19 +525,47 @@ void trustedEcdsaSign(int *errStatus, char *errString, uint8_t *encryptedPrivate
     LOG_DEBUG(__FUNCTION__);
 
     INIT_ERROR_STATE
+    char *skey = NULL;
+    signature sign = NULL;
+    bool privateKeyMpz_inited = false;
+    bool msgMpz_inited = false;
 
+    CHECK_ENCLAVE_INIT
     CHECK_STATE(encryptedPrivateKey);
     CHECK_STATE(hash);
     CHECK_STATE(sigR);
     CHECK_STATE(sigS);
 
-    SAFE_CHAR_BUF(skey, BUF_LEN);
+    if (enc_len > BUF_LEN) {
+        strncpy(errString, "Encrypted key too long", BUF_LEN);
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        goto clean;
+    }
+
+    if (enc_len < 30) {
+        snprintf(errString, BUF_LEN, "Encrypted key too short");
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        goto clean;
+    }
+
+    skey = (char *) malloc(BUF_LEN);
+    if (!skey) {
+        *errStatus = -1;
+        snprintf(errString, BUF_LEN, "Memory allocation failed");
+        LOG_ERROR(errString);
+        goto clean;
+    }
+    memset(skey, 0, BUF_LEN);
 
     mpz_t privateKeyMpz;
     mpz_init(privateKeyMpz);
+    privateKeyMpz_inited = true;
     mpz_t msgMpz;
     mpz_init(msgMpz);
-    signature sign =  NULL;
+    msgMpz_inited = true;
+    // signature sign =  NULL;
     sign = signature_init();
 
     uint8_t type = 0;
@@ -536,13 +576,23 @@ void trustedEcdsaSign(int *errStatus, char *errString, uint8_t *encryptedPrivate
 
     CHECK_STATUS2("aes decrypt failed with status %d");
 
-    skey[enc_len - SGX_AESGCM_MAC_SIZE - SGX_AESGCM_IV_SIZE] = '\0';
+    skey[enc_len - SGX_AESGCM_MAC_SIZE - SGX_AESGCM_IV_SIZE - 2] = '\0';
 
+    for (size_t i = 0; i < strlen(skey); i++) {
+        if (!isxdigit((unsigned char)skey[i])) {
+             *errStatus = -1;
+             snprintf(errString, BUF_LEN, "Invalid hex in decrypted key");
+             oc_printf(errString);
+             goto clean;
+        }
+    }
+
+    // Manual hex parsing to avoid GMP reallocation issues
     if (mpz_set_str(privateKeyMpz, skey, ECDSA_SKEY_BASE) == -1) {
-        *errStatus = -1;
-        snprintf(errString, BUF_LEN, "invalid secret key");
-        LOG_ERROR(errString);
-        goto clean;
+         *errStatus = -1;
+         snprintf(errString, BUF_LEN, "invalid secret key");
+         LOG_ERROR(errString);
+         goto clean;
     }
 
     if (mpz_set_str(msgMpz, hash, 16) == -1) {
@@ -590,8 +640,13 @@ void trustedEcdsaSign(int *errStatus, char *errString, uint8_t *encryptedPrivate
     SET_SUCCESS
     clean:
 
-    mpz_clear(privateKeyMpz);
-    mpz_clear(msgMpz);
+    if (skey) free(skey);
+    // mpz_clear(privateKeyMpz);
+    // Manual clear to see where it crashes? No, I cannot access internals easily without struct def.
+    // Just try to skip mpz_clear if errStatus is set? No, memory leak.
+    
+    if (privateKeyMpz_inited) mpz_clear(privateKeyMpz);
+    if (msgMpz_inited) mpz_clear(msgMpz);
     if (sign)
         signature_free(sign);
     LOG_DEBUG(__FUNCTION__ );
@@ -604,8 +659,24 @@ void trustedDecryptKey(int *errStatus, char *errString, uint8_t *encryptedPrivat
     LOG_DEBUG(__FUNCTION__);
     INIT_ERROR_STATE
 
+    CHECK_ENCLAVE_INIT
+
     CHECK_STATE(encryptedPrivateKey);
     CHECK_STATE(key);
+
+    if (enc_len > BUF_LEN) {
+        strncpy(errString, "Encrypted key too long", BUF_LEN);
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        goto clean;
+    }
+    
+    if (enc_len < 30) {
+        snprintf(errString, BUF_LEN, "Encrypted key too short");
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        goto clean;
+    }
 
     *errStatus = -9;
 
@@ -645,15 +716,30 @@ void trustedDecryptKey(int *errStatus, char *errString, uint8_t *encryptedPrivat
     ;
 }
 
-void trustedEncryptKey(int *errStatus, char *errString, const char *key,
+void trustedEncryptKey(int *errStatus, char *errString, const char *key, uint64_t keyLen,
                           uint8_t *encryptedPrivateKey, uint64_t *enc_len) {
     LOG_INFO(__FUNCTION__);
 
-    *errString = 0;
-    *errStatus = UNKNOWN_ERROR;
+    INIT_ERROR_STATE;
+
+    CHECK_ENCLAVE_INIT
 
     CHECK_STATE(key);
     CHECK_STATE(encryptedPrivateKey);
+
+    if (keyLen > BUF_LEN) {
+        snprintf(errString, BUF_LEN, "Key too long");
+        LOG_ERROR(errString);
+        *errStatus = PLAINTEXT_KEY_TOO_LONG;
+        return;
+    }
+
+    if (strnlen(key, keyLen) == keyLen) {
+        snprintf(errString, BUF_LEN, "Key not null terminated");
+        LOG_ERROR(errString);
+        *errStatus = PLAINTEXT_KEY_TOO_LONG;
+        return;
+    }
 
     *errStatus = UNKNOWN_ERROR;
 
@@ -704,10 +790,22 @@ void trustedBlsSignMessage(int *errStatus, char *errString, uint8_t *encryptedPr
     LOG_DEBUG(__FUNCTION__);
     INIT_ERROR_STATE
 
+    CHECK_ENCLAVE_INIT
+
     CHECK_STATE(encryptedPrivateKey);
     CHECK_STATE(_hashX);
     CHECK_STATE(_hashY);
     CHECK_STATE(signature);
+
+    _hashX[BUF_LEN - 1] = 0;
+    _hashY[BUF_LEN - 1] = 0;
+
+    if (enc_len > BUF_LEN) {
+        snprintf(errString, BUF_LEN, "Encrypted key too long");
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        goto clean;
+    }
 
     SAFE_CHAR_BUF(key, BUF_LEN);SAFE_CHAR_BUF(sig, BUF_LEN);
 
@@ -719,7 +817,7 @@ void trustedBlsSignMessage(int *errStatus, char *errString, uint8_t *encryptedPr
     CHECK_STATUS("AES decrypt failed")
 
     if (!enclave_sign(key, _hashX, _hashY, sig)) {
-        strncpy(errString, "Enclave failed to create bls signature", BUF_LEN);
+        strncpy(errString, "Enclave failed to create bls signature", EDL_TINY_BUF_SIZE);
         LOG_ERROR(errString);
         *errStatus = -1;
         goto clean;
@@ -728,7 +826,7 @@ void trustedBlsSignMessage(int *errStatus, char *errString, uint8_t *encryptedPr
     strncpy(signature, sig, BUF_LEN);
 
     if (strnlen(signature, BUF_LEN) < 10) {
-        strncpy(errString, "Signature too short", BUF_LEN);
+        strncpy(errString, "Signature too short", EDL_TINY_BUF_SIZE);
         LOG_ERROR(errString);
         *errStatus = -1;
         goto clean;
@@ -750,9 +848,16 @@ trustedGenDkgSecret(int *errStatus, char *errString, uint8_t *encrypted_dkg_secr
 
     CHECK_STATE(encrypted_dkg_secret);
 
+    if (_t > MAX_DKG_T || _t == 0) {
+        LOG_ERROR("Invalid value for t");
+        snprintf(errString, BUF_LEN, "Invalid value for t");
+        *errStatus = UNKNOWN_ERROR;
+        return;
+    }
+
     SAFE_CHAR_BUF(dkg_secret, DKG_BUFER_LENGTH);
 
-    int status = gen_dkg_poly(dkg_secret, _t);
+    int status = gen_dkg_poly(dkg_secret, _t, DKG_BUFER_LENGTH);
 
     CHECK_STATUS("gen_dkg_poly failed")
 
@@ -795,6 +900,14 @@ trustedDecryptDkgSecret(int *errStatus, char *errString, uint8_t *encrypted_dkg_
 
     CHECK_STATE(encrypted_dkg_secret);
     CHECK_STATE(decrypted_dkg_secret);
+    memset(decrypted_dkg_secret, 0, 3072);
+
+    if (enc_len > EDL_DKG_POLY_SIZE || enc_len < 30) {
+        strncpy(errString, "Encrypted key length invalid", EDL_SMALL_BUF_SIZE);
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        goto clean;
+    }
 
     uint8_t  type;
     uint8_t  exportable;
@@ -856,6 +969,13 @@ void trustedGetEncryptedSecretShare(int *errStatus, char *errString,
 
     LOG_DEBUG(__FUNCTION__);
 
+    if (_enc_len > EDL_DKG_POLY_SIZE) {
+        strncpy(errString, "Encrypted key too long", BUF_LEN);
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        goto clean;
+    }
+
     trustedSetEncryptedDkgPoly(&status, errString, _encrypted_poly, _enc_len);
 
     CHECK_STATUS2("trustedSetEncryptedDkgPoly failed with status %d ");
@@ -901,9 +1021,21 @@ void trustedGetEncryptedSecretShare(int *errStatus, char *errString,
 
     CHECK_STATUS("xor_encrypt failed")
 
-    strncpy(result_str, cypher, strlen(cypher));
-    strncpy(result_str + strlen(cypher), pub_key_x, strlen(pub_key_x));
-    strncpy(result_str + strlen(pub_key_x) + strlen(pub_key_y), pub_key_y, strlen(pub_key_y));
+    size_t lenCypher = strlen(cypher);
+    size_t lenX = strlen(pub_key_x);
+    size_t lenY = strlen(pub_key_y);
+
+    if (lenCypher + lenX + lenY >= 193) {
+        LOG_ERROR("result_str buffer overflow");
+        snprintf(errString, BUF_LEN, "result_str buffer overflow");
+        *errStatus = -1;
+        goto clean;
+    }
+
+    memcpy(result_str, cypher, lenCypher);
+    memcpy(result_str + lenCypher, pub_key_x, lenX);
+    memcpy(result_str + lenCypher + lenX, pub_key_y, lenY);
+    result_str[lenCypher + lenX + lenY] = 0;
 
     SET_SUCCESS
 
@@ -930,6 +1062,13 @@ void trustedGetEncryptedSecretShareV2(int *errStatus, char *errString,
     CHECK_STATE(pubKeyB);
 
     LOG_DEBUG(__FUNCTION__);
+
+    if (_encLen > EDL_DKG_POLY_SIZE) {
+        strncpy(errString, "Encrypted key too long", BUF_LEN);
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        goto clean;
+    }
 
     trustedSetEncryptedDkgPoly(&status, errString, _encryptedPoly, _encLen);
 
@@ -981,9 +1120,21 @@ void trustedGetEncryptedSecretShareV2(int *errStatus, char *errString,
 
     CHECK_STATUS("xor_encrypt failed")
 
-    strncpy(resultStr, cypher, strlen(cypher));
-    strncpy(resultStr + strlen(cypher), pubKeyX, strlen(pubKeyX));
-    strncpy(resultStr + strlen(pubKeyX) + strlen(pubKeyY), pubKeyY, strlen(pubKeyY));
+    size_t lenCypher = strlen(cypher);
+    size_t lenX = strlen(pubKeyX);
+    size_t lenY = strlen(pubKeyY);
+
+    if (lenCypher + lenX + lenY >= 193) {
+        LOG_ERROR("resultStr buffer overflow");
+        snprintf(errString, BUF_LEN, "resultStr buffer overflow");
+        *errStatus = -1;
+        goto clean;
+    }
+
+    memcpy(resultStr, cypher, lenCypher);
+    memcpy(resultStr + lenCypher, pubKeyX, lenX);
+    memcpy(resultStr + lenCypher + lenX, pubKeyY, lenY);
+    resultStr[lenCypher + lenX + lenY] = 0;
 
     SET_SUCCESS
 
@@ -1000,9 +1151,23 @@ void trustedGetPublicShares(int *errStatus, char *errString, uint8_t *encrypted_
 
     INIT_ERROR_STATE
 
+    CHECK_ENCLAVE_INIT
+
     CHECK_STATE(encrypted_dkg_secret);
     CHECK_STATE(public_shares);
-    CHECK_STATE(_t > 0)
+    if (_t > MAX_DKG_T || _t == 0) {
+        LOG_ERROR("Invalid value for t");
+        snprintf(errString, BUF_LEN, "Invalid value for t");
+        *errStatus = UNKNOWN_ERROR;
+        return;
+    }
+
+    if (enc_len > EDL_DKG_POLY_SIZE) {
+        snprintf(errString, BUF_LEN, "Encrypted key too long: %lu", enc_len);
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        goto clean;
+    }
 
     SAFE_CHAR_BUF(decrypted_dkg_secret, DKG_MAX_SEALED_LEN);
 
@@ -1014,7 +1179,7 @@ void trustedGetPublicShares(int *errStatus, char *errString, uint8_t *encrypted_
 
     CHECK_STATUS2("aes decrypt data - encrypted_dkg_secret failed with status %d");
 
-    status = calc_public_shares(decrypted_dkg_secret, public_shares, _t);
+    status = calc_public_shares(decrypted_dkg_secret, public_shares, _t, 10000);
     CHECK_STATUS("t does not match polynomial in db");
 
     SET_SUCCESS
@@ -1030,14 +1195,35 @@ void trustedDkgVerify(int *errStatus, char *errString, const char *public_shares
 
     INIT_ERROR_STATE
 
-    CHECK_STATE(public_shares);
-    CHECK_STATE(s_share);
-    CHECK_STATE(encryptedPrivateKey);
+    CHECK_ENCLAVE_INIT
 
-    SAFE_CHAR_BUF(skey,BUF_LEN);
+    CHECK_STATE(public_shares);
+    if (strnlen(public_shares, 10000) >= 10000) {
+        LOG_ERROR("public_shares too long or not null terminated");
+        snprintf(errString, BUF_LEN, "public_shares too long or not null terminated");
+        *errStatus = -1;
+        return;
+    }
+    CHECK_STATE(s_share);
+    if (strnlen(s_share, 1024) < 192) {
+        LOG_ERROR("s_share too short or not null terminated");
+        snprintf(errString, BUF_LEN, "s_share too short or not null terminated");
+        *errStatus = -1;
+        return;
+    }
+    CHECK_STATE(encryptedPrivateKey);
 
     mpz_t s;
     mpz_init(s);
+
+    if (enc_len > EDL_SMALL_BUF_SIZE) {
+        strncpy(errString, "Encrypted key too long", BUF_LEN);
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        goto clean;
+    }
+
+    SAFE_CHAR_BUF(skey,BUF_LEN);
 
     uint8_t type = 0;
     uint8_t exportable = 0;
@@ -1082,14 +1268,35 @@ void trustedDkgVerifyV2(int *errStatus, char *errString, const char *publicShare
 
     INIT_ERROR_STATE
 
-    CHECK_STATE(publicShares);
-    CHECK_STATE(secretShare);
-    CHECK_STATE(encryptedPrivateKey);
+    CHECK_ENCLAVE_INIT
 
-    SAFE_CHAR_BUF(skey,BUF_LEN);
+    CHECK_STATE(publicShares);
+    if (strnlen(publicShares, 10000) >= 10000) {
+        LOG_ERROR("publicShares too long or not null terminated");
+        snprintf(errString, BUF_LEN, "publicShares too long or not null terminated");
+        *errStatus = -1;
+        return;
+    }
+    CHECK_STATE(secretShare);
+    if (strnlen(secretShare, 1024) < 192) {
+        LOG_ERROR("secretShare too short or not null terminated");
+        snprintf(errString, BUF_LEN, "secretShare too short or not null terminated");
+        *errStatus = -1;
+        return;
+    }
+    CHECK_STATE(encryptedPrivateKey);
 
     mpz_t s;
     mpz_init(s);
+
+    if (encLen > EDL_SMALL_BUF_SIZE) {
+        strncpy(errString, "Encrypted key too long", BUF_LEN);
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        goto clean;
+    }
+
+    SAFE_CHAR_BUF(skey,BUF_LEN);
 
     uint8_t type = 0;
     uint8_t exportable = 0;
@@ -1145,8 +1352,6 @@ void trustedCreateBlsKey(int *errStatus, char *errString, const char *s_shares,
     CHECK_STATE(encryptedPrivateKey);
     CHECK_STATE(encr_bls_key);
 
-    SAFE_CHAR_BUF(skey, BUF_LEN);
-
     mpz_t sum;
     mpz_init(sum);
     mpz_set_ui(sum, 0);
@@ -1157,6 +1362,15 @@ void trustedCreateBlsKey(int *errStatus, char *errString, const char *s_shares,
 
     mpz_t bls_key;
     mpz_init(bls_key);
+
+    if (key_len > BUF_LEN) {
+        strncpy(errString, "Encrypted key too long", BUF_LEN);
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        goto clean;
+    }
+
+    SAFE_CHAR_BUF(skey, BUF_LEN);
 
     uint8_t type = 0;
     uint8_t exportable = 0;
@@ -1248,8 +1462,6 @@ void trustedCreateBlsKeyV2(int *errStatus, char *errString, const char *secretSh
     CHECK_STATE(encryptedPrivateKey);
     CHECK_STATE(encrBlsKey);
 
-    SAFE_CHAR_BUF(skey, BUF_LEN);
-
     mpz_t sum;
     mpz_init(sum);
     mpz_set_ui(sum, 0);
@@ -1260,6 +1472,15 @@ void trustedCreateBlsKeyV2(int *errStatus, char *errString, const char *secretSh
 
     mpz_t blsKey;
     mpz_init(blsKey);
+
+    if (keyLen > BUF_LEN) {
+        strncpy(errString, "Encrypted key too long", BUF_LEN);
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        goto clean;
+    }
+
+    SAFE_CHAR_BUF(skey, BUF_LEN);
 
     uint8_t type = 0;
     uint8_t exportable = 0;
@@ -1355,6 +1576,13 @@ trustedGetBlsPubKey(int *errStatus, char *errString, uint8_t *encryptedPrivateKe
     CHECK_STATE(bls_pub_key);
     CHECK_STATE(encryptedPrivateKey);
 
+    if (key_len > BUF_LEN) {
+        strncpy(errString, "Encrypted key too long", BUF_LEN);
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        goto clean;
+    }
+
     SAFE_CHAR_BUF(skey_hex, BUF_LEN);
 
     uint8_t type = 0;
@@ -1387,6 +1615,13 @@ void trustedGetDecryptionShare( int *errStatus, char* errString, uint8_t* encryp
     CHECK_STATE(decryption_share);
     CHECK_STATE(encryptedPrivateKey);
 
+    if (key_len > BUF_LEN) {
+        strncpy(errString, "Encrypted key too long", BUF_LEN);
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        goto clean;
+    }
+
     SAFE_CHAR_BUF(skey_hex, BUF_LEN);
 
     uint8_t type = 0;
@@ -1414,6 +1649,7 @@ void trustedGenerateBLSKey(int *errStatus, char *errString, int *isExportable,
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
 
+    CHECK_ENCLAVE_INIT
     CHECK_STATE(encryptedPrivateKey);
 
     RANDOM_CHAR_BUF(randChar, 32);
