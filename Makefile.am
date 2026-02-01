@@ -124,7 +124,7 @@ sgxwallet_LDADD=-l$(SGX_URTS_LIB) -l$(SGX_UAE_SERVICE_LIB) -LlibBLS/deps/deps_in
    -l:libff.a -lgmp -ldl -l:libsgx_capable.a -l:libsgx_tprotected_fs.a \
    -l:libzmq.a \
    -ljsonrpccpp-stub -ljsonrpccpp-server -ljsonrpccpp-client -ljsonrpccpp-common -ljsoncpp -lmicrohttpd \
-   -lboost_system -lboost_thread -lgnutls -lgcrypt -lidn2 -lcurl -lssl -lcrypto -lz -lpthread -lstdc++fs
+   -lboost_system -lboost_thread -lgnutls -lgcrypt -lidn2 -lcurl -lssl -lcrypto -lz -lpthread -lstdc++fs -lsnappy
 
 testw_SOURCES=testw.cpp $(COMMON_SRC)
 nodist_testw_SOURCES=${nodist_sgxwallet_SOURCES}
