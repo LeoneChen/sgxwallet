@@ -36,7 +36,7 @@
 
 using namespace std;
 
-thread_local uint8_t decryptedDkgPoly[DKG_BUFER_LENGTH];
+uint8_t decryptedDkgPoly[DKG_BUFER_LENGTH];
 
 uint8_t *getThreadLocalDecryptedDkgPoly() {
     return decryptedDkgPoly;

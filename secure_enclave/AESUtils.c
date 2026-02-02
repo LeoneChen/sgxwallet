@@ -120,6 +120,11 @@ int AES_decrypt(uint8_t *encrMessage, uint64_t length, char *message, uint64_t m
         return -6;
     }
 
+    if (len < 2) {
+        LOG_ERROR("Decrypted length too short");
+        return -7;
+    }
+
     sgx_status_t status = sgx_rijndael128GCM_decrypt(&(AES_key[512]),
                                                     encrMessage + SGX_AESGCM_MAC_SIZE + SGX_AESGCM_IV_SIZE, len,
                                                     (unsigned char*) message,
@@ -129,8 +134,10 @@ int AES_decrypt(uint8_t *encrMessage, uint64_t length, char *message, uint64_t m
 
     *type = message[0];
     *exportable = message[1];
-    for (int i = 2; i < strlen(message) + 1; i++) {
-        message[i - 2 ] = message[i];
+    
+    memmove(message, message + 2, len - 2);
+    if (len - 2 < msgLen) {
+        message[len - 2] = '\0';
     }
 
     return status;

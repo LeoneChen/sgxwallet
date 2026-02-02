@@ -65,37 +65,47 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
-#define INIT_ERROR_STATE *errString = 0; *errStatus = UNKNOWN_ERROR;
-#define SET_SUCCESS *errStatus = 0;
+#define INIT_ERROR_STATE \
+    if (!errStatus || !errString) { \
+        LOG_ERROR("Invalid error state pointers"); \
+        return; \
+    } \
+    *errString = 0; *errStatus = UNKNOWN_ERROR;
+
+#define SET_SUCCESS if (errStatus) *errStatus = 0;
 
 #define CHECK_STATE(_EXPRESSION_) \
     if (!(_EXPRESSION_)) {        \
         LOG_ERROR("State check failed::");LOG_ERROR(#_EXPRESSION_); \
         LOG_ERROR((const char*) __FILE__); \
-        snprintf(errString, BUF_LEN, "State check failed. Check log."); \
-        *errStatus = -1;                          \
+        if (errString) snprintf(errString, BUF_LEN, "State check failed. Check log."); \
+        if (errStatus) *errStatus = -1;                          \
         return;}
 
 #define CHECK_STATE_CLEAN(_EXPRESSION_) \
     if (!(_EXPRESSION_)) {        \
         LOG_ERROR("State check failed::");LOG_ERROR(#_EXPRESSION_); \
         LOG_ERROR(__FILE__); LOG_ERROR(__LINE__);                   \
-        snprintf(errString, BUF_LEN, "State check failed. Check log."); \
-        *errStatus = -1;                          \
+        if (errString) snprintf(errString, BUF_LEN, "State check failed. Check log."); \
+        if (errStatus) *errStatus = -1;                          \
         goto clean;}
 
 #define CHECK_STATUS(__ERRMESSAGE__) if (status != SGX_SUCCESS) { \
 LOG_ERROR(__FUNCTION__); \
-snprintf(errString, BUF_LEN, "failed with status %d : %s",  status,  __ERRMESSAGE__); \
-LOG_ERROR(errString); \
-*errStatus = status; \
+if (errString) { \
+    snprintf(errString, BUF_LEN, "failed with status %d : %s",  status,  __ERRMESSAGE__); \
+    LOG_ERROR(errString); \
+} \
+if (errStatus) *errStatus = status; \
 goto clean; \
 };
 
 #define CHECK_STATUS2(__ERRMESSAGE__) if (status != SGX_SUCCESS) { \
-snprintf(errString, BUF_LEN, __ERRMESSAGE__, status); \
-LOG_ERROR(errString); \
-*errStatus = status; \
+if (errString) { \
+    snprintf(errString, BUF_LEN, __ERRMESSAGE__, status); \
+    LOG_ERROR(errString); \
+} \
+if (errStatus) *errStatus = status; \
 goto clean; \
 };
 
@@ -123,7 +133,12 @@ unsigned char *globalRandom = NULL;
     } else {called = true;};
 
 void trustedEnclaveInit(uint64_t _logLevel) {
-    CALL_ONCE
+    static volatile bool called = false;
+    if (called)  {
+        LOG_ERROR(__FUNCTION__);
+        LOG_ERROR("This function shouldnt be called twice. Ignoring!");
+        return;
+    } else {called = true;};
     LOG_INFO(__FUNCTION__);
 
     globalLogLevel_ = _logLevel;
@@ -228,12 +243,12 @@ void get_global_random(unsigned char *_randBuff, uint64_t _size) {
 
 void sealHexSEK(int *errStatus, char *errString,
                         uint8_t *encrypted_sek, uint64_t *enc_len, char *sek_hex) {
-    CALL_ONCE
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
 
     CHECK_STATE(encrypted_sek);
     CHECK_STATE(sek_hex);
+    CHECK_STATE(enc_len);
     CHECK_STATE(strnlen(sek_hex, 33) == 32)
 
     uint64_t plaintextLen = strlen(sek_hex) + 1;
@@ -273,12 +288,22 @@ void sealHexSEK(int *errStatus, char *errString,
 
 void trustedGenerateSEK(int *errStatus, char *errString,
                         uint8_t *encrypted_sek, uint64_t *enc_len, char *sek_hex) {
-    CALL_ONCE
+    static volatile bool called = false;
+    if (called) {
+        LOG_ERROR(__FUNCTION__);
+        LOG_ERROR("This function shouldnt be called twice.");
+        if (errString) snprintf(errString, BUF_LEN, "This function shouldnt be called twice.");
+        if (errStatus) *errStatus = UNKNOWN_ERROR;
+        return;
+    } else {
+        called = true;
+    }
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
 
     CHECK_STATE(encrypted_sek);
     CHECK_STATE(sek_hex);
+    CHECK_STATE(enc_len);
 
     RANDOM_CHAR_BUF(SEK_raw, SGX_AESGCM_KEY_SIZE);
 
@@ -300,7 +325,6 @@ void trustedGenerateSEK(int *errStatus, char *errString,
 }
 
 void trustedSetSEK(int *errStatus, char *errString, uint8_t *encrypted_sek) {
-    CALL_ONCE
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
     CHECK_STATE(encrypted_sek);
@@ -334,15 +358,20 @@ void trustedSetSEK(int *errStatus, char *errString, uint8_t *encrypted_sek) {
 
 void trustedSetSEKBackup(int *errStatus, char *errString,
                           uint8_t *encrypted_sek, uint64_t *enc_len, const char *sek_hex) {
-    CALL_ONCE
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
 
     CHECK_STATE(encrypted_sek);
     CHECK_STATE(sek_hex);
+    CHECK_STATE(enc_len);
 
     uint64_t len;
-    hex2carray(sek_hex, &len, (uint8_t *) (AES_key[512]));
+    if (!hex2carray2(sek_hex, &len, (uint8_t *) (AES_key[512]), 32)) {
+         LOG_ERROR("hex2carray failed in trustedSetSEKBackup");
+         if (errString) snprintf(errString, BUF_LEN, "hex2carray failed. Check log.");
+         if (errStatus) *errStatus = -1;
+         return;
+    }
 
     sealHexSEK(errStatus, errString, encrypted_sek, enc_len, (char *)sek_hex);
 
@@ -364,6 +393,14 @@ void trustedGenerateEcdsaKey(int *errStatus, char *errString, int *is_exportable
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
 
+    if (!curve) {
+        snprintf(errString, BUF_LEN, "Enclave not initialized");
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        return;
+    }
+
+    CHECK_STATE(is_exportable);
     CHECK_STATE(encryptedPrivateKey);
     CHECK_STATE(pub_key_x);
     CHECK_STATE(pub_key_y);
@@ -442,6 +479,13 @@ void trustedGetPublicEcdsaKey(int *errStatus, char *errString,
     LOG_DEBUG(__FUNCTION__);
     INIT_ERROR_STATE
 
+    if (!curve) {
+        snprintf(errString, BUF_LEN, "Enclave not initialized");
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        return;
+    }
+
     SAFE_CHAR_BUF(skey, BUF_LEN);
 
     mpz_t privateKeyMpz;
@@ -453,6 +497,13 @@ void trustedGetPublicEcdsaKey(int *errStatus, char *errString,
     CHECK_STATE(encryptedPrivateKey);
     CHECK_STATE(pub_key_x);
     CHECK_STATE(pub_key_y);
+
+    if (enc_len > SMALL_BUF_SIZE) {
+        snprintf(errString, BUF_LEN, "Encrypted key too long");
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        return;
+    }
 
     uint8_t type = 0;
     uint8_t exportable = 0;
@@ -514,10 +565,23 @@ void trustedEcdsaSign(int *errStatus, char *errString, uint8_t *encryptedPrivate
 
     INIT_ERROR_STATE
 
+    if (!curve) {
+        snprintf(errString, BUF_LEN, "Enclave not initialized");
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        return;
+    }
+
     CHECK_STATE(encryptedPrivateKey);
     CHECK_STATE(hash);
     CHECK_STATE(sigR);
     CHECK_STATE(sigS);
+
+    if (enc_len > SMALL_BUF_SIZE) {
+        LOG_ERROR("Encrypted key too long");
+        if (errStatus) *errStatus = -1;
+        return;
+    }
 
     SAFE_CHAR_BUF(skey, BUF_LEN);
 
@@ -607,6 +671,13 @@ void trustedDecryptKey(int *errStatus, char *errString, uint8_t *encryptedPrivat
     CHECK_STATE(encryptedPrivateKey);
     CHECK_STATE(key);
 
+    if (enc_len > SMALL_BUF_SIZE) {
+        *errStatus = -1;
+        snprintf(errString, BUF_LEN, "Encrypted key too long");
+        LOG_ERROR(errString);
+        goto clean;
+    }
+
     *errStatus = -9;
 
     uint8_t type = 0;
@@ -648,6 +719,8 @@ void trustedDecryptKey(int *errStatus, char *errString, uint8_t *encryptedPrivat
 void trustedEncryptKey(int *errStatus, char *errString, const char *key,
                           uint8_t *encryptedPrivateKey, uint64_t *enc_len) {
     LOG_INFO(__FUNCTION__);
+
+    if (!errStatus || !errString) return;
 
     *errString = 0;
     *errStatus = UNKNOWN_ERROR;
@@ -709,6 +782,12 @@ void trustedBlsSignMessage(int *errStatus, char *errString, uint8_t *encryptedPr
     CHECK_STATE(_hashY);
     CHECK_STATE(signature);
 
+    if (enc_len > TINY_BUF_SIZE) {
+        LOG_ERROR("Encrypted key too long");
+        *errStatus = -1;
+        goto clean;
+    }
+
     SAFE_CHAR_BUF(key, BUF_LEN);SAFE_CHAR_BUF(sig, BUF_LEN);
 
     uint8_t type = 0;
@@ -751,6 +830,13 @@ trustedGenDkgSecret(int *errStatus, char *errString, uint8_t *encrypted_dkg_secr
     CHECK_STATE(encrypted_dkg_secret);
 
     SAFE_CHAR_BUF(dkg_secret, DKG_BUFER_LENGTH);
+
+    if (_t > 30 || _t == 0) {
+        snprintf(errString, BUF_LEN, "Invalid threshold _t: %lu. Must be between 1 and 30.", _t);
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        goto clean;
+    }
 
     int status = gen_dkg_poly(dkg_secret, _t);
 
@@ -796,6 +882,13 @@ trustedDecryptDkgSecret(int *errStatus, char *errString, uint8_t *encrypted_dkg_
     CHECK_STATE(encrypted_dkg_secret);
     CHECK_STATE(decrypted_dkg_secret);
 
+    // 3050 is the size of encrypted_dkg_secret in EDL
+    if (enc_len > 3050) {
+        LOG_ERROR("Encrypted dkg secret too long");
+        if (errStatus) *errStatus = -1;
+        goto clean;
+    }
+
     uint8_t  type;
     uint8_t  exportable;
 
@@ -818,6 +911,13 @@ void trustedSetEncryptedDkgPoly(int *errStatus, char *errString, uint8_t *encryp
     INIT_ERROR_STATE
 
     CHECK_STATE(encrypted_poly);
+
+    // 3050 is the size of encrypted_poly in EDL
+    if (enc_len > 3050) {
+        LOG_ERROR("Encrypted poly too long");
+        if (errStatus) *errStatus = -1;
+        return;
+    }
 
     memset(getThreadLocalDecryptedDkgPoly(), 0, DKG_BUFER_LENGTH);
 
@@ -1034,6 +1134,12 @@ void trustedDkgVerify(int *errStatus, char *errString, const char *public_shares
     CHECK_STATE(s_share);
     CHECK_STATE(encryptedPrivateKey);
 
+    if (enc_len > SMALL_BUF_SIZE) {
+        LOG_ERROR("Encrypted key too long");
+        if (errStatus) *errStatus = -1;
+        return;
+    }
+
     SAFE_CHAR_BUF(skey,BUF_LEN);
 
     mpz_t s;
@@ -1085,6 +1191,12 @@ void trustedDkgVerifyV2(int *errStatus, char *errString, const char *publicShare
     CHECK_STATE(publicShares);
     CHECK_STATE(secretShare);
     CHECK_STATE(encryptedPrivateKey);
+
+    if (encLen > SMALL_BUF_SIZE) {
+        LOG_ERROR("Encrypted key too long");
+        if (errStatus) *errStatus = -1;
+        return;
+    }
 
     SAFE_CHAR_BUF(skey,BUF_LEN);
 
@@ -1144,6 +1256,12 @@ void trustedCreateBlsKey(int *errStatus, char *errString, const char *s_shares,
     CHECK_STATE(s_shares);
     CHECK_STATE(encryptedPrivateKey);
     CHECK_STATE(encr_bls_key);
+
+    if (key_len > SMALL_BUF_SIZE) {
+        LOG_ERROR("Encrypted key too long");
+        if (errStatus) *errStatus = -1;
+        return;
+    }
 
     SAFE_CHAR_BUF(skey, BUF_LEN);
 
@@ -1247,6 +1365,12 @@ void trustedCreateBlsKeyV2(int *errStatus, char *errString, const char *secretSh
     CHECK_STATE(secretShares);
     CHECK_STATE(encryptedPrivateKey);
     CHECK_STATE(encrBlsKey);
+
+    if (keyLen > SMALL_BUF_SIZE) {
+        LOG_ERROR("Encrypted key too long");
+        if (errStatus) *errStatus = -1;
+        return;
+    }
 
     SAFE_CHAR_BUF(skey, BUF_LEN);
 
@@ -1355,6 +1479,13 @@ trustedGetBlsPubKey(int *errStatus, char *errString, uint8_t *encryptedPrivateKe
     CHECK_STATE(bls_pub_key);
     CHECK_STATE(encryptedPrivateKey);
 
+    if (key_len > SMALL_BUF_SIZE) {
+        snprintf(errString, BUF_LEN, "Encrypted key too long");
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        goto clean;
+    }
+
     SAFE_CHAR_BUF(skey_hex, BUF_LEN);
 
     uint8_t type = 0;
@@ -1386,6 +1517,13 @@ void trustedGetDecryptionShare( int *errStatus, char* errString, uint8_t* encryp
 
     CHECK_STATE(decryption_share);
     CHECK_STATE(encryptedPrivateKey);
+
+    if (key_len > SMALL_BUF_SIZE) {
+        snprintf(errString, BUF_LEN, "Encrypted key too long");
+        LOG_ERROR(errString);
+        *errStatus = -1;
+        goto clean;
+    }
 
     SAFE_CHAR_BUF(skey_hex, BUF_LEN);
 
