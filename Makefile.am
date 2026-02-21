@@ -62,7 +62,11 @@ CLEANFILES = $(COMMON_ENCLAVE_SRC) secure_enclave.edl secure_enclave.signed.so
 
 ## The build target
 
+if ENCLAVE_FUZZ
+bin_PROGRAMS = sgxwallet
+else
 bin_PROGRAMS = sgxwallet testw sgx_util
+endif
 
 
 ## You can't use $(wildcard ...) with automake so all source files
@@ -80,6 +84,9 @@ COMMON_SRC = SGXException.cpp ExitHandler.cpp zmq_src/ZMQClient.cpp zmq_src/RspM
 COMMON_ENCLAVE_SRC = secure_enclave_u.c secure_enclave_u.h
 
 sgxwallet_SOURCES = sgxwall.cpp $(COMMON_SRC)
+if ENCLAVE_FUZZ
+sgxwallet_SOURCES += harness.cpp
+endif
 
 
 nodist_sgxwallet_SOURCES = $(COMMON_ENCLAVE_SRC)
@@ -103,6 +110,13 @@ secure_enclave.signed.so: secure_enclave/secure_enclave.signed.so
 ## Use the variables, not the actual library names to ensure these
 ## targets work on simulation builds.
 
+if ENCLAVE_FUZZ
+sgxwallet_CPPFLAGS=$(AM_CPPFLAGS) -DENCLAVE_FUZZ=1 -I/usr/lib/llvm-13/lib/clang/13.0.1/include/fuzzer
+sgxwallet_LDFLAGS=$(AM_LDFLAGS) -Wl,-whole-archive -lSGXSanRTApp -Wl,-no-whole-archive -rdynamic
+else
+sgxwallet_CPPFLAGS=$(AM_CPPFLAGS)
+sgxwallet_LDFLAGS=$(AM_LDFLAGS)
+endif
 sgxwallet_LDADD=-l$(SGX_URTS_LIB) -l$(SGX_UAE_SERVICE_LIB) -LlibBLS/deps/deps_inst/x86_or_x64/lib -Lleveldb/build -LlibBLS/build \
    -LlibBLS/build/libff/libff \
    -Llibzmq/build/lib/ \
@@ -110,7 +124,7 @@ sgxwallet_LDADD=-l$(SGX_URTS_LIB) -l$(SGX_UAE_SERVICE_LIB) -LlibBLS/deps/deps_in
    -l:libff.a -lgmp -ldl -l:libsgx_capable.a -l:libsgx_tprotected_fs.a \
    -l:libzmq.a \
    -ljsonrpccpp-stub -ljsonrpccpp-server -ljsonrpccpp-client -ljsonrpccpp-common -ljsoncpp -lmicrohttpd \
-   -lboost_system -lboost_thread -lgnutls -lgcrypt -lidn2 -lcurl -lssl -lcrypto -lz -lpthread -lstdc++fs
+   -lboost_system -lboost_thread -lgnutls -lgcrypt -lidn2 -lcurl -lssl -lcrypto -lz -lpthread -lstdc++fs -lsnappy
 
 testw_SOURCES=testw.cpp $(COMMON_SRC)
 nodist_testw_SOURCES=${nodist_sgxwallet_SOURCES}
@@ -127,4 +141,4 @@ sgx_util_LDADD=-LlibBLS/deps/deps_inst/x86_or_x64/lib -Lleveldb/build -LlibBLS/b
                    -l:libzmq.a \
                    -l:libbls.a -l:libleveldb.a \
                    -l:libff.a -lgmp -ljsonrpccpp-stub -ljsonrpccpp-server -ljsonrpccpp-client -ljsonrpccpp-common \
-                   -ljsoncpp -lmicrohttpd -lgnutls -lgcrypt -lidn2 -lcurl -lssl -lcrypto -lz -lpthread -ldl
+                   -ljsoncpp -lmicrohttpd -lgnutls -lgcrypt -lidn2 -lcurl -lssl -lcrypto -lz -lpthread -ldl -lsnappy

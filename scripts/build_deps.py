@@ -99,7 +99,7 @@ assert subprocess.call(["bash", "-c", "./sgx_linux_x64_sdk_2.25.100.3.bin --pref
 print("Make GMP");
 
 os.chdir(GMP_DIR)
-assert subprocess.call(["bash", "-c", "./configure --prefix=" + TGMP_BUILD_DIR + " --disable-shared --enable-static --with-pic --enable-sgx --with-sgxsdk=" + SDK_DIR + "/sgxsdk"]) == 0
+assert subprocess.call(["bash", "-c", "./configure --prefix=" + TGMP_BUILD_DIR + " --disable-shared --enable-static --with-pic --enable-sgx --with-sgxsdk=" + SDK_DIR + "/sgxsdk CFLAGS=\"-Og -g\" CXXFLAGS=\"-Og -g\""]) == 0
 
 assert subprocess.call(["make", "install"]) == 0
 assert subprocess.call(["make", "clean"]) == 0
