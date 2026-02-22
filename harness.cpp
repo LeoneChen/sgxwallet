@@ -1050,7 +1050,7 @@ static void _harness_trustedBlsSignMessage(void) {
   err_string = NULL;
   if (g_fdp->ConsumeProbability<double>() < 0.9 /* as an example */) {
     size_t count_0_err_string =
-        ((256) * (sizeof(char)) + sizeof(char) - 1) / sizeof(char);
+        ((1024) * (sizeof(char)) + sizeof(char) - 1) / sizeof(char);
     err_string = (char *)calloc(count_0_err_string, sizeof(char));
     g_alloc_mgr.push_back((uint8_t *)err_string);
   }
@@ -1058,7 +1058,7 @@ static void _harness_trustedBlsSignMessage(void) {
   encrypted_key = NULL;
   if (g_fdp->ConsumeProbability<double>() < 0.9 /* as an example */) {
     size_t count_0_encrypted_key =
-        ((256) * (sizeof(uint8_t)) + sizeof(uint8_t) - 1) / sizeof(uint8_t);
+        ((1024) * (sizeof(uint8_t)) + sizeof(uint8_t) - 1) / sizeof(uint8_t);
     encrypted_key = (uint8_t *)calloc(count_0_encrypted_key, sizeof(uint8_t));
     g_alloc_mgr.push_back((uint8_t *)encrypted_key);
     g_fdp->ConsumeData((void *)encrypted_key,

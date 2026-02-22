@@ -67,6 +67,8 @@ extern unsigned char *globalRandom;
 
 extern domain_parameters curve;
 
+extern int inited;
+
 #define SAFE_FREE(__X__)                                                       \
   if (__X__) {                                                                 \
     free(__X__);                                                               \

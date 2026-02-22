@@ -246,7 +246,12 @@ int gen_dkg_poly(char *secret, unsigned _t) {
       result += stringFromFr(cur_coef);
       result += ":";
     }
-    strncpy(secret, result.c_str(), result.length() + 1);
+    if (result.length() >= DKG_BUFER_LENGTH) {
+      return status;
+    }
+
+    strncpy(secret, result.c_str(), DKG_BUFER_LENGTH - 1);
+    secret[DKG_BUFER_LENGTH - 1] = '\0';
 
     if (strlen(secret) == 0) {
       return status;

@@ -118,12 +118,19 @@ unsigned char *globalRandom = NULL;
     static volatile bool called = false;\
     if (called)  { \
         LOG_ERROR(__FUNCTION__); \
-        LOG_ERROR("This function shouldnt be called twice. Aborting!"); \
-        abort(); \
+        LOG_ERROR("This function shouldnt be called twice."); \
+        snprintf(errString, BUF_LEN, "This function should not be called twice."); \
+        *errStatus = -1; \
+        return; \
     } else {called = true;};
 
 void trustedEnclaveInit(uint64_t _logLevel) {
-    CALL_ONCE
+    static volatile bool called = false;
+    if (called)  {
+        LOG_ERROR(__FUNCTION__);
+        LOG_ERROR("This function shouldnt be called twice. Ignoring.");
+        return;
+    } else {called = true;};
     LOG_INFO(__FUNCTION__);
 
     globalLogLevel_ = _logLevel;
@@ -197,7 +204,7 @@ void *reallocate_function(void *ptr, size_t osize, size_t nsize) {
      * free() and try again, but would you trust the OS at this point?
      */
 
-    if (!sgx_is_outside_enclave((void *) ptr, nsize))
+    if (!sgx_is_outside_enclave((void *) nptr, nsize))
         abort();
 
     return (void *) nptr;
@@ -274,11 +281,19 @@ void sealHexSEK(int *errStatus, char *errString,
 
 void trustedGenerateSEK(int *errStatus, char *errString,
                         uint8_t *encrypted_sek, uint64_t *enc_len, char *sek_hex) {
-    CALL_ONCE
     LOG_INFO(__FUNCTION__);
+
+    if (!errStatus || !errString) {
+        LOG_ERROR("trustedGenerateSEK: errStatus or errString is NULL");
+        return;
+    }
+
+    CALL_ONCE
+
     INIT_ERROR_STATE
 
     CHECK_STATE(encrypted_sek);
+    CHECK_STATE(enc_len);
     CHECK_STATE(sek_hex);
 
     RANDOM_CHAR_BUF(SEK_raw, SGX_AESGCM_KEY_SIZE);
@@ -301,10 +316,22 @@ void trustedGenerateSEK(int *errStatus, char *errString,
 }
 
 void trustedSetSEK(int *errStatus, char *errString, uint8_t *encrypted_sek) {
-    CALL_ONCE
+    static volatile bool called = false;
     LOG_INFO(__FUNCTION__);
+    if (!errStatus || !errString) {
+        LOG_ERROR("trustedSetSEK: errStatus or errString is NULL");
+        return;
+    }
     INIT_ERROR_STATE
+    if (called)  {
+        LOG_ERROR(__FUNCTION__);
+        LOG_ERROR("This function shouldnt be called twice.");
+        snprintf(errString, BUF_LEN, "This function should not be called twice.");
+        *errStatus = -1;
+        return;
+    }
     CHECK_STATE(encrypted_sek);
+    called = true;
     SAFE_CHAR_BUF(aes_key_hex, BUF_LEN);
 
     uint32_t dec_len = BUF_LEN;
@@ -335,12 +362,21 @@ void trustedSetSEK(int *errStatus, char *errString, uint8_t *encrypted_sek) {
 
 void trustedSetSEKBackup(int *errStatus, char *errString,
                           uint8_t *encrypted_sek, uint64_t *enc_len, const char *sek_hex) {
-    CALL_ONCE
     LOG_INFO(__FUNCTION__);
+
+    if (errStatus == NULL || errString == NULL) {
+        LOG_ERROR("trustedSetSEKBackup: errStatus or errString is NULL");
+        return;
+    }
+
     INIT_ERROR_STATE
 
     CHECK_STATE(encrypted_sek);
+    CHECK_STATE(enc_len);
     CHECK_STATE(sek_hex);
+    CHECK_STATE(strnlen(sek_hex, 33) == 32);
+
+    CALL_ONCE
 
     uint64_t len;
     hex2carray(sek_hex, &len, (uint8_t *) (AES_key[512]));
@@ -363,11 +399,20 @@ void trustedSetSEKBackup(int *errStatus, char *errString,
 void trustedGenerateEcdsaKey(int *errStatus, char *errString, int *is_exportable,
                                 uint8_t *encryptedPrivateKey, uint64_t *enc_len, char *pub_key_x, char *pub_key_y) {
     LOG_INFO(__FUNCTION__);
+
+    if (errStatus == NULL || errString == NULL) {
+        LOG_ERROR("trustedGenerateEcdsaKey: errStatus or errString is NULL");
+        return;
+    }
+
     INIT_ERROR_STATE
 
     CHECK_STATE(encryptedPrivateKey);
     CHECK_STATE(pub_key_x);
     CHECK_STATE(pub_key_y);
+    CHECK_STATE(is_exportable);
+    CHECK_STATE(enc_len);
+    CHECK_STATE(curve);
 
     RANDOM_CHAR_BUF(rand_char, 32);
 
@@ -441,6 +486,12 @@ void trustedGenerateEcdsaKey(int *errStatus, char *errString, int *is_exportable
 void trustedGetPublicEcdsaKey(int *errStatus, char *errString,
                                  uint8_t *encryptedPrivateKey, uint64_t enc_len, char *pub_key_x, char *pub_key_y) {
     LOG_DEBUG(__FUNCTION__);
+
+    if (!errStatus || !errString) {
+        LOG_ERROR("trustedGetPublicEcdsaKey: errStatus or errString is NULL");
+        return;
+    }
+
     INIT_ERROR_STATE
 
     SAFE_CHAR_BUF(skey, BUF_LEN);
@@ -512,6 +563,9 @@ static uint64_t sigCounter = 0;
 void trustedEcdsaSign(int *errStatus, char *errString, uint8_t *encryptedPrivateKey, uint64_t enc_len,
                          const char *hash, char *sigR, char *sigS, uint8_t *sig_v, int base) {
     LOG_DEBUG(__FUNCTION__);
+
+    if (!errStatus || !errString)
+        return;
 
     INIT_ERROR_STATE
 
@@ -602,6 +656,12 @@ void trustedEcdsaSign(int *errStatus, char *errString, uint8_t *encryptedPrivate
 void trustedDecryptKey(int *errStatus, char *errString, uint8_t *encryptedPrivateKey,
                           uint64_t enc_len, char *key) {
     LOG_DEBUG(__FUNCTION__);
+
+    if (!errStatus || !errString) {
+        LOG_ERROR("trustedDecryptKey: errStatus or errString is NULL");
+        return;
+    }
+
     INIT_ERROR_STATE
 
     CHECK_STATE(encryptedPrivateKey);
@@ -648,6 +708,11 @@ void trustedDecryptKey(int *errStatus, char *errString, uint8_t *encryptedPrivat
 void trustedEncryptKey(int *errStatus, char *errString, const char *key,
                           uint8_t *encryptedPrivateKey, uint64_t *enc_len) {
     LOG_INFO(__FUNCTION__);
+
+    if (!errStatus || !errString || !enc_len) {
+        LOG_ERROR("trustedEncryptKey: null output pointer");
+        return;
+    }
 
     *errString = 0;
     *errStatus = UNKNOWN_ERROR;
@@ -702,6 +767,10 @@ void trustedBlsSignMessage(int *errStatus, char *errString, uint8_t *encryptedPr
                               uint64_t enc_len, char *_hashX,
                               char *_hashY, char *signature) {
     LOG_DEBUG(__FUNCTION__);
+
+    if (!errStatus || !errString)
+        return;
+
     INIT_ERROR_STATE
 
     CHECK_STATE(encryptedPrivateKey);
@@ -746,9 +815,16 @@ void trustedBlsSignMessage(int *errStatus, char *errString, uint8_t *encryptedPr
 void
 trustedGenDkgSecret(int *errStatus, char *errString, uint8_t *encrypted_dkg_secret, uint64_t *enc_len, size_t _t) {
     LOG_INFO(__FUNCTION__);
+
+    if (!errStatus || !errString || !enc_len) {
+        return;
+    }
+
     INIT_ERROR_STATE
 
+    CHECK_STATE(inited)
     CHECK_STATE(encrypted_dkg_secret);
+    CHECK_STATE(_t > 0 && _t <= DKG_BUFER_LENGTH / MAX_COMPONENT_LENGTH);
 
     SAFE_CHAR_BUF(dkg_secret, DKG_BUFER_LENGTH);
 
@@ -791,6 +867,10 @@ trustedDecryptDkgSecret(int *errStatus, char *errString, uint8_t *encrypted_dkg_
                            uint64_t enc_len,
                            uint8_t *decrypted_dkg_secret) {
     LOG_INFO(__FUNCTION__);
+
+    if (!errStatus || !errString)
+        return;
+
     INIT_ERROR_STATE
 
     CHECK_STATE(encrypted_dkg_secret);
@@ -844,6 +924,10 @@ void trustedGetEncryptedSecretShare(int *errStatus, char *errString,
                                        uint8_t ind) {
 
     LOG_INFO(__FUNCTION__);
+
+    if (!errStatus || !errString)
+        return;
+
     INIT_ERROR_STATE
 
     uint64_t enc_len;
@@ -919,6 +1003,10 @@ void trustedGetEncryptedSecretShareV2(int *errStatus, char *errString,
                                       char *resultStr, char *secretShareG2, char *pubKeyB, uint8_t _t, uint8_t _n,
                                       uint8_t ind) {
     LOG_INFO(__FUNCTION__);
+
+    if (!errStatus || !errString)
+        return;
+
     INIT_ERROR_STATE
 
     uint64_t encLen;
@@ -998,6 +1086,11 @@ void trustedGetPublicShares(int *errStatus, char *errString, uint8_t *encrypted_
                                unsigned _t) {
     LOG_INFO(__FUNCTION__);
 
+    if (!errStatus || !errString) {
+        LOG_ERROR("trustedGetPublicShares: errStatus or errString is NULL");
+        return;
+    }
+
     INIT_ERROR_STATE
 
     CHECK_STATE(encrypted_dkg_secret);
@@ -1027,6 +1120,11 @@ void trustedGetPublicShares(int *errStatus, char *errString, uint8_t *encrypted_
 void trustedDkgVerify(int *errStatus, char *errString, const char *public_shares, const char *s_share,
                          uint8_t *encryptedPrivateKey, uint64_t enc_len, unsigned _t, int _ind, int *result) {
     LOG_INFO(__FUNCTION__);
+
+    if (!errStatus || !errString || !result) {
+        LOG_ERROR("Null pointer passed for errStatus, errString, or result");
+        return;
+    }
 
     INIT_ERROR_STATE
 
@@ -1079,6 +1177,11 @@ void trustedDkgVerify(int *errStatus, char *errString, const char *public_shares
 void trustedDkgVerifyV2(int *errStatus, char *errString, const char *publicShares, const char *secretShare,
                          uint8_t *encryptedPrivateKey, uint64_t encLen, unsigned _t, int _ind, int *result) {
     LOG_INFO(__FUNCTION__);
+
+    if (!errStatus || !errString) {
+        LOG_ERROR("errStatus or errString is NULL");
+        return;
+    }
 
     INIT_ERROR_STATE
 
@@ -1138,6 +1241,11 @@ void trustedCreateBlsKey(int *errStatus, char *errString, const char *s_shares,
                             uint64_t *enc_bls_key_len) {
 
     LOG_INFO(__FUNCTION__);
+
+    if (!errStatus || !errString) {
+        LOG_ERROR("errStatus or errString is NULL");
+        return;
+    }
 
     INIT_ERROR_STATE
 
@@ -1241,6 +1349,11 @@ void trustedCreateBlsKeyV2(int *errStatus, char *errString, const char *secretSh
                             uint64_t *encBlsKeyLen) {
 
     LOG_INFO(__FUNCTION__);
+
+    if (!errStatus || !errString) {
+        LOG_ERROR("errStatus or errString is NULL");
+        return;
+    }
 
     INIT_ERROR_STATE
 
@@ -1350,6 +1463,11 @@ trustedGetBlsPubKey(int *errStatus, char *errString, uint8_t *encryptedPrivateKe
                        char *bls_pub_key) {
     LOG_DEBUG(__FUNCTION__);
 
+    if (!errStatus || !errString) {
+        LOG_ERROR("trustedGetBlsPubKey: errStatus or errString is NULL");
+        return;
+    }
+
     INIT_ERROR_STATE
 
     CHECK_STATE(bls_pub_key);
@@ -1382,6 +1500,11 @@ void trustedGetDecryptionShare( int *errStatus, char* errString, uint8_t* encryp
                                 char* decryption_share ) {
     LOG_DEBUG(__FUNCTION__);
 
+    if (!errStatus || !errString) {
+        LOG_ERROR("trustedGetDecryptionShare: errStatus or errString is NULL");
+        return;
+    }
+
     INIT_ERROR_STATE
 
     CHECK_STATE(decryption_share);
@@ -1412,6 +1535,12 @@ void trustedGetDecryptionShare( int *errStatus, char* errString, uint8_t* encryp
 void trustedGenerateBLSKey(int *errStatus, char *errString, int *isExportable,
                            uint8_t *encryptedPrivateKey, uint64_t *encLen) {
     LOG_INFO(__FUNCTION__);
+
+    if (!errStatus || !errString) {
+        LOG_ERROR("trustedGenerateBLSKey: errStatus or errString is NULL");
+        return;
+    }
+
     INIT_ERROR_STATE
 
     CHECK_STATE(encryptedPrivateKey);
