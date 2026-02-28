@@ -33,7 +33,11 @@ namespace cache {
     template<typename key_t, typename value_t>
     class lru_cache {
 
+#if ENCLAVE_FUZZ
+        mutable std::recursive_mutex m;
+#else
         std::recursive_mutex m;
+#endif
 
     public:
         typedef typename std::pair<key_t, value_t> key_value_pair_t;
