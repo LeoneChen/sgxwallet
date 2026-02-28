@@ -365,6 +365,7 @@ void trustedGenerateEcdsaKey(int *errStatus, char *errString, int *is_exportable
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
 
+    CHECK_STATE(curve);
     CHECK_STATE(encryptedPrivateKey);
     CHECK_STATE(pub_key_x);
     CHECK_STATE(pub_key_y);
