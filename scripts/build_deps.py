@@ -66,7 +66,7 @@ assert subprocess.call(["cp", "configure.gmp", GMP_DIR + "/configure"]) == 0
 
 print("Build LibBLS");
 os.chdir(BLS_DIR + "/deps")
-assert subprocess.call(["bash", "-c", "./build.sh"]) == 0
+assert subprocess.call(["bash", "-c", "DEBUG=1 ./build.sh"]) == 0
 os.chdir(BLS_DIR)
 assert subprocess.call(["bash", "-c", "cmake -H. -Bbuild -DBUILD_TESTS=OFF"]) == 0
 os.chdir(BLS_DIR + "/build")
@@ -89,7 +89,7 @@ assert subprocess.call(["bash", "-c", "cmake -DCMAKE_BUILD_TYPE=Release .. && cm
 print("Build JSON"); 
 
 os.chdir(JSON_LIBS_DIR)
-assert subprocess.call(["bash", "-c", "./build.sh"]) == 0
+assert subprocess.call(["bash", "-c", "DEBUG=1 ./build.sh"]) == 0
 
 print("Install Linux SDK");
 
@@ -99,7 +99,7 @@ assert subprocess.call(["bash", "-c", "./sgx_linux_x64_sdk_2.25.100.3.bin --pref
 print("Make GMP");
 
 os.chdir(GMP_DIR)
-assert subprocess.call(["bash", "-c", "./configure --prefix=" + TGMP_BUILD_DIR + " --disable-shared --enable-static --with-pic --enable-sgx --with-sgxsdk=" + SDK_DIR + "/sgxsdk"]) == 0
+assert subprocess.call(["bash", "-c", "./configure --prefix=" + TGMP_BUILD_DIR + " --disable-shared --enable-static --with-pic --enable-sgx --with-sgxsdk=" + SDK_DIR + "/sgxsdk CFLAGS=\"-Og -g\" CXXFLAGS=\"-Og -g\""]) == 0
 
 assert subprocess.call(["make", "install"]) == 0
 assert subprocess.call(["make", "clean"]) == 0
