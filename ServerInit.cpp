@@ -150,7 +150,7 @@ uint64_t initEnclave() {
 
     spdlog::info("Enclave created and started successfully");
 
-    status = trustedEnclaveInit(eid, enclaveLogLevel);
+    // status = trustedEnclaveInit(eid, enclaveLogLevel);
   }
 
   if (status != SGX_SUCCESS) {

