@@ -52,3 +52,7 @@
 /cert/*.crt
 /jsonrpc/
 /sgx-gmp/
+/sgx_util
+/secure_enclave/Makefile.in
+configure~
+*.log

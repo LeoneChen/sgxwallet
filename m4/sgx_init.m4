@@ -29,7 +29,14 @@ AC_DEFUN([SGX_INIT],[
 	AC_ARG_WITH([sgxsdk],
 		[AS_HELP_STRING([--with-sgxsdk=path],
 			[Set the path to your Intel SGX SDK directory (defaults to auto-detection)])
-		], [SGXSDK=$withval],[SGXSDK="detect"])
+		], [SGX_SDK=$withval],[SGX_SDK=""])
+
+	AC_ARG_ENABLE([enclave-fuzz],
+		[AS_HELP_STRING([--enable-enclave-fuzz], [Enable enclave fuzzing instrumentation])],
+		[enable_enclave_fuzz=$enableval],
+		[enable_enclave_fuzz=no])
+
+	AM_CONDITIONAL([ENCLAVE_FUZZ], [test "x$enable_enclave_fuzz" = "xyes"])
 
 	AS_IF([test "x$sgxsim" = "yes"], [sgxenable=yes])
 	AS_IF([test "x$sgxenable" != "xno"],
@@ -137,6 +144,17 @@ AC_DEFUN([SGX_INIT],[
 
 	dnl Substitutions for building an enclave
 
+	AS_IF([test "x$enable_enclave_fuzz" = "xyes"], [
+	AC_SUBST(SGX_ENCLAVE_CFLAGS,
+		["-nostdinc -fvisibility=hidden -fpie -ffunction-sections -fdata-sections -fstack-protector -fsanitize=address -mllvm -asan-enclave -mllvm -asan-use-after-return=never -mllvm -asan-opt-globals=false -fsanitize-coverage=inline-8bit-counters,pc-table -fno-sanitize-link-runtime"])
+	AC_SUBST(SGX_ENCLAVE_CPPFLAGS, 
+		["-I\$(SGXSDK_INCDIR) -I\$(SGXSDK_INCDIR)/tlibc -DENCLAVE_FUZZ=1"])
+	AC_SUBST(SGX_ENCLAVE_CXXFLAGS, ["-nostdinc++ -fvisibility=hidden -fpie -ffunction-sections -fdata-sections -fstack-protector"])
+	AC_SUBST(SGX_ENCLAVE_LDFLAGS,
+		["-nostdlib -nodefaultlibs -nostartfiles -L\$(SGXSDK_LIBDIR)"])
+	AC_SUBST(SGX_ENCLAVE_LDADD,
+		["-Wl,--no-undefined -Wl,--whole-archive -lsgxsan_enclave -l\$(SGX_TRTS_LIB) -Wl,--no-whole-archive -Wl,--start-group \$(SGX_EXTRA_TLIBS) -lsgx_tstdc -lsgx_tcrypto -lsgx_pthread -l\$(SGX_TSERVICE_LIB) -Wl,--end-group -Wl,-Bstatic -Wl,-Bsymbolic -Wl,-pie,-eenclave_entry -Wl,--export-dynamic -Wl,--defsym,__ImageBase=0"])
+	], [
 	AC_SUBST(SGX_ENCLAVE_CFLAGS,
 	 	["-nostdinc -fvisibility=hidden -fpie -ffunction-sections -fdata-sections -fstack-protector"])
 	AC_SUBST(SGX_ENCLAVE_CPPFLAGS, 
@@ -146,6 +164,7 @@ AC_DEFUN([SGX_INIT],[
 		["-nostdlib -nodefaultlibs -nostartfiles -L\$(SGXSDK_LIBDIR)"])
 	AC_SUBST(SGX_ENCLAVE_LDADD,
 		["-Wl,--no-undefined -Wl,--whole-archive -l\$(SGX_TRTS_LIB) -Wl,--no-whole-archive -Wl,--start-group \$(SGX_EXTRA_TLIBS) -lsgx_tstdc -lsgx_tcrypto -l\$(SGX_TSERVICE_LIB) -Wl,--end-group -Wl,-Bstatic -Wl,-Bsymbolic -Wl,-pie,-eenclave_entry -Wl,--export-dynamic -Wl,--defsym,__ImageBase=0"])
+	])
 
 	])
 
