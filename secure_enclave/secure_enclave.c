@@ -365,6 +365,7 @@ void trustedGenerateEcdsaKey(int *errStatus, char *errString, int *is_exportable
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
 
+    CHECK_STATE(curve);
     CHECK_STATE(encryptedPrivateKey);
     CHECK_STATE(pub_key_x);
     CHECK_STATE(pub_key_y);
@@ -1439,7 +1440,7 @@ void trustedGenerateBLSKey(int *errStatus, char *errString, int *isExportable,
     char salt[39] = "424c532d5349472d4b455947454e2d53414c54"; // "BLS-SIG-KEYGEN-SALT" hexademical
 
     int L = 48; // math.ceil(3*math.ceil(math.log2(q))/16)
-    char l[2] = "30"; // octet L
+    char l[3] = "30"; // octet L
 
     int k = 0;
     while (mpz_cmp_ui(skey, 0) == 0) {

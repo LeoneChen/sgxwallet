@@ -72,6 +72,11 @@ int gen_session_key(char *skey_str, char *pb_keyB, char *common_key) {
         goto clean;
     }
 
+    if (strnlen(pb_keyB, 128) < 128) {
+        LOG_ERROR("gen_session_key: pb_keyB is too short");
+        goto clean;
+    }
+
     strncpy(pb_keyB_x, pb_keyB, 64);
     pb_keyB_x[64] = 0;
 
@@ -114,6 +119,11 @@ int session_key_recover(const char *skey_str, const char *sshare, char *common_k
     mpz_init(skey);
     point pub_keyB = point_init();
     point session_key = point_init();
+
+    if (!sshare || strnlen(sshare, 193) < 192) {
+        LOG_ERROR("session_key_recover: sshare is null or too short");
+        goto clean;
+    }
 
     pb_keyB_x[64] = 0;
     strncpy(pb_keyB_x, sshare + 64, 64);
