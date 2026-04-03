@@ -1,6 +1,7 @@
 #pragma once
 
 static void harness_dkgverifyv2_ecdsa_key(void) {
+  init_enclave_and_sek();
   int errStatus = 0;
   char *err_string = (char *)calloc(1024, sizeof(char));
   if (!err_string) return;

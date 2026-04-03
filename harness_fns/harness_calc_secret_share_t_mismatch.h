@@ -1,6 +1,7 @@
 #pragma once
 
 static void harness_calc_secret_share_t_mismatch(void) {
+  init_enclave_and_sek();
   int errStatus = 0;
   char *err_string = (char *)calloc(1024, sizeof(char));
   if (!err_string) return;

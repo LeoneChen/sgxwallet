@@ -1,6 +1,7 @@
 #pragma once
 
 static void harness_bls_pubkey_invalid_hex(void) {
+  init_enclave_and_sek();
   int errStatus = 0;
   char *err_string = (char *)calloc(1024, sizeof(char));
   char *key = (char *)calloc(65, 1);

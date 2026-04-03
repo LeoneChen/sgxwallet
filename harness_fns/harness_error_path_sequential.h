@@ -1,6 +1,7 @@
 #pragma once
 
 static void harness_error_path_sequential(void) {
+  init_enclave_and_sek();
   int errStatus = 0;
   char *err_string = (char *)calloc(1024, 1);
   if (!err_string) return;
