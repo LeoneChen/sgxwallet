@@ -257,6 +257,10 @@ static void fill_uppercase_hex_string(char *buf, size_t len) {
 #include "harness_fns/harness_createbls_v2_loop.h"
 #include "harness_fns/harness_createbls_v2_2shares.h"
 #include "harness_fns/harness_secretshare_null_sequential.h"
+#include "harness_fns/harness_encrypt_key_no_null.h"
+#include "harness_fns/harness_create_bls_key_no_null.h"
+#include "harness_fns/harness_create_bls_key_v2_no_null.h"
+#include "harness_fns/harness_decryption_share_no_null.h"
 
 
 extern "C" void customized_init() {
