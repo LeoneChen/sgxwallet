@@ -365,6 +365,7 @@ void trustedGenerateEcdsaKey(int *errStatus, char *errString, int *is_exportable
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
 
+    CHECK_STATE(curve);
     CHECK_STATE(encryptedPrivateKey);
     CHECK_STATE(pub_key_x);
     CHECK_STATE(pub_key_y);
@@ -1168,7 +1169,7 @@ void trustedCreateBlsKey(int *errStatus, char *errString, const char *s_shares,
 
     skey[ECDSA_SKEY_LEN - 1] = 0;
 
-    int num_shares = strlen(s_shares) / 192;
+    int num_shares = strnlen(s_shares, 6145) / 192;
 
     for (int i = 0; i < num_shares; i++) { SAFE_CHAR_BUF(encr_sshare, 65);
         strncpy(encr_sshare, s_shares + 192 * i, 64);
@@ -1270,7 +1271,7 @@ void trustedCreateBlsKeyV2(int *errStatus, char *errString, const char *secretSh
 
     skey[ECDSA_SKEY_LEN - 1] = 0;
 
-    int numShares = strlen(secretShares) / 192;
+    int numShares = strnlen(secretShares, 6145) / 192;
 
     for (int i = 0; i < numShares; i++) {
         SAFE_CHAR_BUF(encrSecretShare, 65);
@@ -1399,7 +1400,12 @@ void trustedGetDecryptionShare( int *errStatus, char* errString, uint8_t* encryp
 
     skey_hex[ECDSA_SKEY_LEN - 1] = 0;
 
-    status = getDecryptionShare(skey_hex, public_decryption_value, decryption_share);
+    // public_decryption_value is [in, count=320], not guaranteed null-terminated
+    char safe_pdv[321];
+    strncpy(safe_pdv, public_decryption_value, 320);
+    safe_pdv[320] = '\0';
+
+    status = getDecryptionShare(skey_hex, safe_pdv, decryption_share);
 
     CHECK_STATUS("could not calculate decryption share");
 
@@ -1439,7 +1445,7 @@ void trustedGenerateBLSKey(int *errStatus, char *errString, int *isExportable,
     char salt[39] = "424c532d5349472d4b455947454e2d53414c54"; // "BLS-SIG-KEYGEN-SALT" hexademical
 
     int L = 48; // math.ceil(3*math.ceil(math.log2(q))/16)
-    char l[2] = "30"; // octet L
+    char l[3] = "30"; // octet L
 
     int k = 0;
     while (mpz_cmp_ui(skey, 0) == 0) {

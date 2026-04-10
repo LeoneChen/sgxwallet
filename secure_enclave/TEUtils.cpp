@@ -132,6 +132,12 @@ std::vector<libff::alt_bn128_Fq> SplitStringToFq(const char *coords,
         pos = str.length();
       std::string token = str.substr(prev, pos - prev);
       if (!token.empty()) {
+        // Validate token contains only decimal digits
+        bool valid = true;
+        for (char c : token) {
+          if (c < '0' || c > '9') { valid = false; break; }
+        }
+        if (!valid) return result;
         libff::alt_bn128_Fq coeff(token.c_str());
         result.push_back(coeff);
       }
@@ -175,6 +181,11 @@ EXTERNC int getDecryptionShare(char *skey_hex, char *decryptionValue,
     libff::alt_bn128_Fr bls_skey(skey_dec);
 
     auto splitted_decryption_value = SplitStringToFq(decryptionValue, ':');
+
+    if (splitted_decryption_value.size() != 4) {
+      mpz_clear(skey);
+      return 1;
+    }
 
     libff::alt_bn128_G2 decryption_value;
     decryption_value.Z = libff::alt_bn128_Fq2::one();
