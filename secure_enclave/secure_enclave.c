@@ -1169,7 +1169,7 @@ void trustedCreateBlsKey(int *errStatus, char *errString, const char *s_shares,
     skey[ECDSA_SKEY_LEN - 1] = 0;
 
     int num_shares = strlen(s_shares) / 192;
-
+ 
     for (int i = 0; i < num_shares; i++) { SAFE_CHAR_BUF(encr_sshare, 65);
         strncpy(encr_sshare, s_shares + 192 * i, 64);
         encr_sshare[64] = 0;
