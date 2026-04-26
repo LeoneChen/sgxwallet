@@ -23,6 +23,7 @@
 
 #define GMP_WITH_SGX 1
 
+#include <cctype>
 #include <cstdint>
 #include <string.h>
 
@@ -223,6 +224,27 @@ bool enclave_sign(const char *_keyString, const char *_hashXString,
 
     if (!key) {
       LOG_ERROR("Null key");
+      goto clean;
+    }
+
+    std::string hashXStr(_hashXString);
+    std::string hashYStr(_hashYString);
+    bool hashXValid = !hashXStr.empty();
+    for (size_t i = 0; i < hashXStr.length(); ++i) {
+      if (!isdigit(static_cast<unsigned char>(hashXStr[i]))) {
+        hashXValid = false;
+        break;
+      }
+    }
+    bool hashYValid = !hashYStr.empty();
+    for (size_t i = 0; i < hashYStr.length(); ++i) {
+      if (!isdigit(static_cast<unsigned char>(hashYStr[i]))) {
+        hashYValid = false;
+        break;
+      }
+    }
+    if (!hashXValid || !hashYValid) {
+      LOG_ERROR("Non-digit characters in hash coordinates");
       goto clean;
     }
 
