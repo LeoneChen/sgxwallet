@@ -50,6 +50,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "Point.h"
 #include "DomainParameters.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+void init_alt_bn128_params(void);
+#ifdef __cplusplus
+}
+#endif
+
 #include "Signature.h"
 #include "Curves.h"
 #include "DHDkg.h"
@@ -80,24 +88,29 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     if (!(_EXPRESSION_)) {        \
         LOG_ERROR("State check failed::");LOG_ERROR(#_EXPRESSION_); \
         LOG_ERROR(__FILE__); LOG_ERROR(__LINE__);                   \
-        snprintf(errString, BUF_LEN, "State check failed. Check log."); \
+        memcpy(errString, "State check failed. Check log.", 31); \
+        errString[30] = '\0'; \
         *errStatus = -1;                          \
         goto clean;}
 
 #define CHECK_STATUS(__ERRMESSAGE__) if (status != SGX_SUCCESS) { \
-LOG_ERROR(__FUNCTION__); \
-snprintf(errString, BUF_LEN, "failed with status %d : %s",  status,  __ERRMESSAGE__); \
-LOG_ERROR(errString); \
-*errStatus = status; \
-goto clean; \
+    char _check_err_buf[BUF_LEN]; \
+    LOG_ERROR(__FUNCTION__); \
+    snprintf(_check_err_buf, BUF_LEN, "failed with status %d : %s",  status,  __ERRMESSAGE__); \
+    memcpy(errString, _check_err_buf, strnlen(_check_err_buf, BUF_LEN) + 1); \
+    LOG_ERROR(_check_err_buf); \
+    *errStatus = status; \
+    goto clean; \
 };
 
 #define CHECK_STATUS2(__ERRMESSAGE__) if (status != SGX_SUCCESS) { \
-snprintf(errString, BUF_LEN, __ERRMESSAGE__, status); \
-LOG_ERROR(errString); \
-*errStatus = status; \
-goto clean; \
-};
+    char _check_err_buf[BUF_LEN]; \
+    snprintf(_check_err_buf, BUF_LEN, __ERRMESSAGE__, status); \
+    memcpy(errString, _check_err_buf, strnlen(_check_err_buf, BUF_LEN) + 1); \
+    LOG_ERROR(_check_err_buf); \
+    *errStatus = status; \
+    goto clean; \
+}
 
 void *(*gmp_realloc_func)(void *, size_t, size_t);
 
@@ -123,7 +136,11 @@ unsigned char *globalRandom = NULL;
     } else {called = true;};
 
 void trustedEnclaveInit(uint64_t _logLevel) {
-    CALL_ONCE
+    static volatile bool called = false;
+    if (called) {
+        return;
+    }
+    called = true;
     LOG_INFO(__FUNCTION__);
 
     globalLogLevel_ = _logLevel;
@@ -229,7 +246,12 @@ void get_global_random(unsigned char *_randBuff, uint64_t _size) {
 
 void sealHexSEK(int *errStatus, char *errString,
                         uint8_t *encrypted_sek, uint64_t *enc_len, char *sek_hex) {
-    CALL_ONCE
+    static volatile bool called = false;
+    if (called) {
+        *errStatus = 0;
+        return;
+    }
+    called = true;
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
 
@@ -274,7 +296,12 @@ void sealHexSEK(int *errStatus, char *errString,
 
 void trustedGenerateSEK(int *errStatus, char *errString,
                         uint8_t *encrypted_sek, uint64_t *enc_len, char *sek_hex) {
-    CALL_ONCE
+    static volatile bool called = false;
+    if (called) {
+        *errStatus = 0;
+        return;
+    }
+    called = true;
     LOG_INFO(__FUNCTION__);
     INIT_ERROR_STATE
 
@@ -719,17 +746,19 @@ void trustedBlsSignMessage(int *errStatus, char *errString, uint8_t *encryptedPr
     CHECK_STATUS("AES decrypt failed")
 
     if (!enclave_sign(key, _hashX, _hashY, sig)) {
-        strncpy(errString, "Enclave failed to create bls signature", BUF_LEN);
-        LOG_ERROR(errString);
+        memcpy(errString, "Enclave failed to create bls signature", 39);
+        errString[39] = '\0';
+        LOG_ERROR("Enclave failed to create bls signature");
         *errStatus = -1;
         goto clean;
     }
 
     strncpy(signature, sig, BUF_LEN);
 
-    if (strnlen(signature, BUF_LEN) < 10) {
-        strncpy(errString, "Signature too short", BUF_LEN);
-        LOG_ERROR(errString);
+    if (strnlen(sig, BUF_LEN) < 10) {
+        memcpy(errString, "Signature too short", 20);
+        errString[20] = '\0';
+        LOG_ERROR("Signature too short");
         *errStatus = -1;
         goto clean;
     }
@@ -1439,7 +1468,7 @@ void trustedGenerateBLSKey(int *errStatus, char *errString, int *isExportable,
     char salt[39] = "424c532d5349472d4b455947454e2d53414c54"; // "BLS-SIG-KEYGEN-SALT" hexademical
 
     int L = 48; // math.ceil(3*math.ceil(math.log2(q))/16)
-    char l[2] = "30"; // octet L
+    char l[3] = "30"; // octet L
 
     int k = 0;
     while (mpz_cmp_ui(skey, 0) == 0) {

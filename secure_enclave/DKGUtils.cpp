@@ -158,6 +158,15 @@ string ConvertG1ToString(const libff::alt_bn128_G1 &elem, int base = 10,
   return result;
 }
 
+static bool isAllDigits(const string &s) {
+  for (size_t i = 0; i < s.length(); ++i) {
+    if (!isdigit(static_cast<unsigned char>(s[i]))) {
+      return false;
+    }
+  }
+  return !s.empty();
+}
+
 libff::alt_bn128_G1 stringToG1(const char *elem) {
   string str(elem);
 
@@ -167,8 +176,13 @@ libff::alt_bn128_G1 stringToG1(const char *elem) {
     int pos = str.find(":", 0);
     if (pos == string::npos)
       pos = str.length();
-    result.X = libff::alt_bn128_Fq(str.substr(0, pos).c_str());
-    result.Y = libff::alt_bn128_Fq(str.substr(pos, string::npos).c_str());
+    string x_str = str.substr(0, pos);
+    string y_str = str.substr(pos, string::npos);
+    if (!isAllDigits(x_str) || !isAllDigits(y_str)) {
+      return result;
+    }
+    result.X = libff::alt_bn128_Fq(x_str.c_str());
+    result.Y = libff::alt_bn128_Fq(y_str.c_str());
 
     if (str.find(":", pos) != string::npos)
       return result;
@@ -203,7 +217,7 @@ vector<libff::alt_bn128_Fr> SplitStringToFr(const char *coeffs,
       if (pos == string::npos)
         pos = str.length();
       string token = str.substr(prev, pos - prev);
-      if (!token.empty()) {
+      if (!token.empty() && isAllDigits(token)) {
         libff::alt_bn128_Fr coeff(token.c_str());
         result.push_back(coeff);
       }
@@ -230,6 +244,12 @@ bool isG2(const libff::alt_bn128_G2 &point) {
 }
 
 int gen_dkg_poly(char *secret, unsigned _t) {
+
+  static bool initialized = false;
+  if (!initialized) {
+    libff::init_alt_bn128_params();
+    initialized = true;
+  }
 
   int status = 1;
   string result;

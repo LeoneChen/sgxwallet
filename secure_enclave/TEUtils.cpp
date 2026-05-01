@@ -113,6 +113,15 @@ std::string ConvertG2ElementToString(const libff::alt_bn128_G2 &elem,
   return result;
 }
 
+static bool isAllDigits(const std::string &s) {
+  for (size_t i = 0; i < s.length(); ++i) {
+    if (!isdigit(static_cast<unsigned char>(s[i]))) {
+      return false;
+    }
+  }
+  return !s.empty();
+}
+
 std::vector<libff::alt_bn128_Fq> SplitStringToFq(const char *coords,
                                                  const char symbol) {
   std::vector<libff::alt_bn128_Fq> result;
@@ -131,7 +140,7 @@ std::vector<libff::alt_bn128_Fq> SplitStringToFq(const char *coords,
       if (pos == std::string::npos)
         pos = str.length();
       std::string token = str.substr(prev, pos - prev);
-      if (!token.empty()) {
+      if (!token.empty() && isAllDigits(token)) {
         libff::alt_bn128_Fq coeff(token.c_str());
         result.push_back(coeff);
       }
@@ -175,6 +184,10 @@ EXTERNC int getDecryptionShare(char *skey_hex, char *decryptionValue,
     libff::alt_bn128_Fr bls_skey(skey_dec);
 
     auto splitted_decryption_value = SplitStringToFq(decryptionValue, ':');
+    if (splitted_decryption_value.size() < 4) {
+      mpz_clear(skey);
+      return 1;
+    }
 
     libff::alt_bn128_G2 decryption_value;
     decryption_value.Z = libff::alt_bn128_Fq2::one();

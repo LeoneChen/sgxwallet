@@ -32,13 +32,26 @@ bigint<n>::bigint(const char* s) /// Initialize from a string containing an inte
 
     for (size_t i = 0; i < l; ++i)
     {
-        assert(s[i] >= '0' && s[i] <= '9');
+        if (!(s[i] >= '0' && s[i] <= '9')) {
+            delete[] s_copy;
+            this->clear();
+            return;
+        }
         s_copy[i] = s[i] - '0';
     }
 
-    mp_size_t limbs_written = mpn_set_str(this->data, s_copy, l, 10);
-    assert(limbs_written <= n);
+    mp_limb_t* tmp = new mp_limb_t[l];
+    mp_size_t limbs_written = mpn_set_str(tmp, s_copy, l, 10);
+    if (limbs_written <= n) {
+        memcpy(this->data, tmp, limbs_written * sizeof(mp_limb_t));
+        for (size_t i = limbs_written; i < n; ++i) {
+            this->data[i] = 0;
+        }
+    } else {
+        this->clear();
+    }
 
+    delete[] tmp;
     delete[] s_copy;
 }
 
